@@ -1068,13 +1068,14 @@ gmd(
 gmd(
   {
     pattern: "acceptall",
+    pattern: "acceptall",
     aliases: ["approveall"],
     react: "✅",
     category: "group",
     description: "Accept all pending join requests in the group.",
   },
   async (from, Gifted, conText) => {
-    const { reply, react, sender, isGroup, isBotAdmin, isAdmin, isSuperAdmin } =
+    const { reply, react, isGroup, isBotAdmin, isAdmin, isSuperAdmin } =
       conText;
 
     if (!isGroup) return reply("❌ This command only works in groups!");
