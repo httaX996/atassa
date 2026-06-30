@@ -9,6 +9,26 @@ const { gmd, commands, monospace, formatBytes } = require("../gift"),
   ram = `${formatBytes(freeMemoryBytes)}/${formatBytes(totalMemoryBytes)}`;
 const { sendButtons } = require("gifted-btns");
 
+const ck = {
+    key: {
+        fromMe: false,
+        participant: "0@s.whatsapp.net",
+        remoteJid: "status@broadcast"
+    },
+    message: {
+        contactMessage: {
+            displayName: "〴ᴄʜᴇᴛʜᴍɪɴᴀ ×͜×",
+            vcard: `BEGIN:VCARD
+VERSION:3.0
+FN:Meta
+ORG:META AI;
+TEL;type=CELL;type=VOICE;waid=13135550002:+13135550002
+END:VCARD`
+        }
+    }
+};
+
+
 gmd(
   {
     pattern: "ping",
@@ -39,7 +59,7 @@ gmd(
     await sendButtons(Gifted, from, {
       title: "Bot Speed",
       text: `⚡ Pong: ${responseTime}ms`,
-      footer: `> *${botFooter}*`,
+      footer: `> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`,
       buttons: [
         { id: `${botPrefix}uptime`, text: "⏱️ Uptime" },
         {
@@ -50,7 +70,7 @@ gmd(
           }),
         },
       ],
-    });
+    }, { quoted: ck });
 
     /*await Gifted.sendMessage(from, {
       text: 
