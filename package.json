@@ -56,6 +56,7 @@
     "sharp": "0.32.6",
     "sqlite3": "5.1.7",
     "stream": "*",
+    "@xaviabot/fb-downloader": "1.0.14",
     "util": "*",
     "wa-sticker-formatter": "*"
   },
