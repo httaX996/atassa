@@ -57,6 +57,7 @@
     "sqlite3": "5.1.7",
     "stream": "*",
     "@xaviabot/fb-downloader": "1.0.14",
+    "ytsearch-venom": "latest",
     "util": "*",
     "wa-sticker-formatter": "*"
   },
