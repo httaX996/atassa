@@ -29,6 +29,9 @@ function extractButtonId(msg) {
     return null;
 }
 
+const getFBInfo = require("@xaviabot/fb-downloader");
+
+
 gmd(
     {
         pattern: "gitclone",
@@ -113,26 +116,24 @@ gmd(
     },
 );
 
- gmd(
+
+gmd(
     {
         pattern: "fb",
         category: "downloader",
         react: "🧩",
         aliases: ["fbdl", "facebookdl", "facebook"],
-        description: "Download Facebook videos with custom layout",
+        description: "Download Facebook videos using xaviabot package",
     },
     async (from, Gifted, conText) => {
         const {
             q,
-            mek,
             reply,
             react,
             botName,
             botFooter,
             gmdBuffer,
             toAudio,
-            GiftedTechApi,
-            GiftedApiKey,
         } = conText;
 
         // Custom Quoted Context (ck object)
@@ -150,8 +151,6 @@ gmd(
             }
         };
 
-        const MAX_MEDIA_SIZE = 100 * 1024 * 1024; // 100MB Limit
-
         if (!q || (!q.includes("facebook.com") && !q.includes("fb.watch"))) {
             await react("❌");
             return reply("❌ Please provide a valid Facebook URL.");
@@ -160,34 +159,31 @@ gmd(
         await react("💡");
 
         try {
-            // Fetching via Gifted API
-            const apiUrl = `${GiftedTechApi}/api/download/facebook?apikey=${GiftedApiKey}&url=${encodeURIComponent(q)}`;
-            const response = await axios.get(apiUrl, { timeout: 60000 });
+            // Fetching via @xaviabot/fb-downloader package
+            const result = await getFBInfo(q);
 
-            if (!response.data?.success || !response.data?.result) {
+            if (!result || (!result.sd && !result.hd)) {
                 await react("❌");
                 return reply("Failed to fetch video. Please check the URL and try again.");
             }
 
-            const { title, duration, thumbnail, hd_video, sd_video } = response.data.result;
             const dateNow = Date.now();
 
-            // Set up Interactive Buttons
+            // Set up Interactive Buttons based on package results
             const buttons = [];
-            if (sd_video) buttons.push({ id: `fb_sd_${dateNow}`, text: "SD QUALITY 🪫" });
-            if (hd_video) buttons.push({ id: `fb_hd_${dateNow}`, text: "HD QUALITY 🔋" });
+            if (result.sd) buttons.push({ id: `fb_sd_${dateNow}`, text: "SD QUALITY 🪫" });
+            if (result.hd) buttons.push({ id: `fb_hd_${dateNow}`, text: "HD QUALITY 🔋" });
             buttons.push({ id: `fb_audio_${dateNow}`, text: "AUDIO 🎶" });
 
             const captionHeader = `🧩 \`𝗖𝗞 𝗙𝗕 𝗗𝗢𝗪𝗡𝗟𝗢𝗔𝗗𝗘𝗥\` 🧩\n\n` +
-                                  `🔖 \`TITLE:\` *${title || "Facebook Video"}*\n` +
-                                  `🔗 \`URL:\` *${q}*\n\n` +
-                                  `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`;
+                                  `🔖 \`TITLE:\` *${result.title || "Facebook Video"}*\n` +
+                                  `🔗 \`URL:\` *${q}*\n\n`;
 
             await sendButtons(Gifted, from, {
                 title: `${botName} FACEBOOK DOWNLOADER`,
                 text: captionHeader,
                 footer: botFooter,
-                image: { url: thumbnail },
+                image: { url: result.thumbnail || "https://i.imgur.com/vE7vW6G.png" },
                 buttons: buttons,
             }, { quoted: ck });
 
@@ -206,12 +202,13 @@ gmd(
 
                 try {
                     if (selectedButtonId.startsWith("fb_audio")) {
-                        const sourceVideo = hd_video || sd_video;
+                        const sourceVideo = result.sd || result.hd;
                         if (!sourceVideo) {
                             await react("❌");
                             return reply("No video available for audio extraction.", messageData);
                         }
 
+                        // Downloading video buffer to convert it to audio
                         const videoBuffer = await gmdBuffer(sourceVideo);
                         if (!videoBuffer || videoBuffer instanceof Error || !Buffer.isBuffer(videoBuffer)) {
                             await react("❌");
@@ -236,7 +233,7 @@ gmd(
                             { quoted: ck }
                         );
                     } else {
-                        const selectedVideoUrl = selectedButtonId.startsWith("fb_hd") ? hd_video : sd_video;
+                        const selectedVideoUrl = selectedButtonId.startsWith("fb_hd") ? result.hd : result.sd;
 
                         if (!selectedVideoUrl) {
                             await react("❌");
@@ -273,6 +270,7 @@ gmd(
         }
     }
 );
+
 
 
 
