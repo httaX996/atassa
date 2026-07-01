@@ -8,6 +8,8 @@ const { gmd, commands, monospace, formatBytes } = require("../gift"),
   readmore = more.repeat(4001),
   ram = `${formatBytes(freeMemoryBytes)}/${formatBytes(totalMemoryBytes)}`;
 const { sendButtons } = require("gifted-btns");
+const { sendInteractiveMessage } = require('gifted-btns');
+
 
 const ck = {
     key: {
@@ -222,8 +224,8 @@ gmd(
         image: { url: botPic },
         caption: menus.trim()  
       };
-      await sendButtons(Gifted, from, {
-        text: menus,
+      await sendInteractiveMessage(Gifted, from, {
+        text: menus.trim(),
   interactiveButtons: [
     // Single select picker (list inside a button)
     {
