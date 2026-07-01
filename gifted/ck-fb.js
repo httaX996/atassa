@@ -1,8 +1,6 @@
-const config = require('../config')
 const { gmd, commands, monospace, formatBytes } = require("../gift");
-const getFBInfo = require("@xaviabot/fb-downloader");
 const { sendInteractiveMessage } = require('gifted-btns');
-
+const getFBInfo = require("@xaviabot/fb-downloader");
 
 gmd(
   {
@@ -29,10 +27,10 @@ gmd(
       reply,
       ownerNumber,
     } = conText;
-  try {
+    try {
 
   if (!q || !q.startsWith("https://")) {
-    return conn.sendMessage(from, { text: "❌ Please provide a valid URL." }, { quoted: mek });
+    return Gifted.sendMessage(from, { text: "❌ Please provide a valid URL." }, { quoted: mek });
 }
 
 await Gifted.sendMessage(from, { react: { text: "💡", key: mek.key } });
@@ -44,45 +42,21 @@ const result = await getFBInfo(q);
 🔖 \`TITLE:\` *${result.title}*
 🔗 \`URL:\` *${q}*
 
-🔢 \`ʀᴇᴘʟʏ ʙᴇʟᴏᴡ ɴᴜᴍʙᴇʀ\`
+🔢 \`ʀᴇᴘʟʏ ʙᴇʟᴏᴡ ᴄᴏᴍᴍᴀɴᴅ\`
 
-\`1\` *|* ❭❭◦ *SD QULITY* 🪫
-\`2\` *|* ❭❭◦ *HD QULITY* 🔋
-\`3\` *|* ❭❭◦ *AUDIO* 🎶
+\`fbsd\` *|* ❭❭◦ *SD QUALITY* 🪫
+\`fbhd\` *|* ❭❭◦ *HD QUALITY* 🔋
+\`fbad\` *|* ❭❭◦ *AUDIO* 🎶
 
 > 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*
 `;
 
-await sendButtons(Gifted, from, {
-text: captionHeader,
-  interactiveButtons: [
-    // Single select picker (list inside a button)
-    {
-      name: 'single_select',
-      buttonParamsJson: JSON.stringify({
-        title: 'Pick One',
-        sections: [
-          {
-            title: 'Video Download',
-            rows: [
-              { header: 'SD QUALITY', title: '', description: 'SD_QUALITY', id: 'opt_hello' },
-              { header: 'HD QUALITY', title: '', description: 'HD_QUALITY', id: 'opt_bye' }
-            ]
-          },
-          {
-            title: 'Audio Download',
-            rows: [
-              { header: 'T', title: 'Testing', description: 'Just a test', id: 'opt_test' },
-              { header: 'C', title: 'Cancel', description: 'Nevermind', id: 'opt_cancel' }
-            ]
-          }
-        ]
-      })
-    }
-  ]
-});
-
-
+const sentMsg = await Gifted.sendMessage(from, {
+  image: { url: result.thumbnail}, 
+  caption: captionHeader
+},
+  { quoted: ck }
+);
 const messageID = sentMsg.key.id; // Save the message ID for later reference
 
 
@@ -90,53 +64,57 @@ const messageID = sentMsg.key.id; // Save the message ID for later reference
 conn.ev.on('messages.upsert', async (messageUpdate) => {
     const mek = messageUpdate.messages[0];
     if (!mek.message) return;
-    const messageType = mek.message.conversation || mek.message.extendedTextMessage?.text;
+    
+    // Get text from conversation, extended text, or context info if available
+    const messageType = mek.message.conversation || mek.message.extendedTextMessage?.text || "";
+    const cleanMessage = messageType.trim().toLowerCase(); // Normalize input
+    
     const from = mek.key.remoteJid;
-    const sender = mek.key.participant || mek.key.remoteJid;
 
     // Check if the message is a reply to the previously sent message
     const isReplyToSentMsg = mek.message.extendedTextMessage && mek.message.extendedTextMessage.contextInfo.stanzaId === messageID;
 
     if (isReplyToSentMsg) {
-        // React to the user's reply (the "1" or "2" message)
-        await conn.sendMessage(from, { react: { text: '⬇️', key: mek.key } });
         
-        
-
-        // React to the upload (sending the file)
-        await Gifted.sendMessage(from, { react: { text: '⬆️', key: mek.key } });
-
-        if (messageType === 'SD_QUALITY') {
-            // Handle option 1 (sd File)
+        if (cleanMessage === 'fbsd') {
+            if (!result.sd) return Gifted.sendMessage(from, { text: "❌ SD quality not available." }, { quoted: mek });
+            
+            await Gifted.sendMessage(from, { react: { text: '⬇️', key: mek.key } });
+            await Gifted.sendMessage(from, { react: { text: '⬆️', key: mek.key } });
+            
             await Gifted.sendMessage(from, {
-              video: { url: result.sd}, // Ensure `img.allmenu` is a valid image URL or base64 encoded image
+              video: { url: result.sd}, 
               caption: "> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*",
-            },
-                                   { quoted: ck }
-              
-            );
-          }
+            }, { quoted: ck });
+            
+            await Gifted.sendMessage(from, { react: { text: '✅', key: mek.key } });
+        }
 
-          else if (messageType === 'HD_QUALITY') {
-            // Handle option 2 (hd File)
+        else if (cleanMessage === 'fbhd') {
+            if (!result.hd) return Gifted.sendMessage(from, { text: "❌ HD quality not available." }, { quoted: mek });
+            
+            await Gifted.sendMessage(from, { react: { text: '⬇️', key: mek.key } });
+            await Gifted.sendMessage(from, { react: { text: '⬆️', key: mek.key } });
+            
             await Gifted.sendMessage(from, {
-              video: { url: result.hd}, // Ensure `img.allmenu` is a valid image URL or base64 en",
-              caption: "> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*",
-            },
-                                   { quoted: ck }
-            );
-          }
+              video: { url: result.hd}, 
+              caption: "> 👨🏻‍💻 *ᴄʜᴇᴛʜ🏻ᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*",
+            }, { quoted: ck });
+            
+            await Gifted.sendMessage(from, { react: { text: '✅', key: mek.key } });
+        }
            
-          else if (messageType === '3') {
-            //Handle option 3 (audio File)  
-          await Gifted.sendMessage(from, { audio: { url: result.sd }, mimetype: "audio/mpeg" }, { quoted: ck })
-          }
-          
-          
-        // React to the successful completion of the task
-        await Gifted.sendMessage(from, { react: { text: '✅', key: mek.key } });
-
-        console.log("Response sent successfully");
+        else if (cleanMessage === 'fbad') {
+            await Gifted.sendMessage(from, { react: { text: '⬇️', key: mek.key } });
+            await Gifted.sendMessage(from, { react: { text: '⬆️', key: mek.key } });
+            
+            await Gifted.sendMessage(from, { 
+              audio: { url: result.sd }, 
+              mimetype: "audio/mpeg" 
+            }, { quoted: ck });
+            
+            await Gifted.sendMessage(from, { react: { text: '✅', key: mek.key } });
+        }
     }
   });
 } catch (e) {
