@@ -115,7 +115,7 @@ gmd(
 
 gmd(
     {
-        pattern: "fb",
+        pattern: "fb2",
         category: "downloader",
         react: "📘",
         aliases: ["fbdl", "facebookdl", "facebook"],
