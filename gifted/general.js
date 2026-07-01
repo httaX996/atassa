@@ -236,7 +236,7 @@ gmd(
           {
             title: 'Choices',
             rows: [
-              { header: 'H', title: 'Hello', description: 'Says hi', id: 'opt_hello' },
+              { header: 'uptime', title: 'uptime', description: 'Says hi', id: `${botPrefix}uptime` },
               { header: 'B', title: 'Bye', description: 'Says bye', id: 'opt_bye' }
             ]
           },
