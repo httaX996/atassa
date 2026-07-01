@@ -220,19 +220,38 @@ gmd(
 
       const giftedMess = {
         image: { url: botPic },
-        caption: menus.trim(),
-        contextInfo: {
-          mentionedJid: [sender],
-          forwardingScore: 5,
-          isForwarded: true,
-          forwardedNewsletterMessageInfo: {
-            newsletterJid: newsletterJid,
-            newsletterName: botName,
-            serverMessageId: 0,
-          },
-        },
+        caption: menus.trim()  
       };
-      await Gifted.sendMessage(from, giftedMess, { quoted: mek });
+      await sendButtons(Gifted, from, {
+        text: menus,
+  interactiveButtons: [
+    // Single select picker (list inside a button)
+    {
+      name: 'single_select',
+      buttonParamsJson: JSON.stringify({
+        title: 'Pick One',
+        sections: [
+          {
+            title: 'Choices',
+            rows: [
+              { header: 'H', title: 'Hello', description: 'Says hi', id: 'opt_hello' },
+              { header: 'B', title: 'Bye', description: 'Says bye', id: 'opt_bye' }
+            ]
+          },
+          {
+            title: 'Other Options',
+            rows: [
+              { header: 'T', title: 'Testing', description: 'Just a test', id: 'opt_test' },
+              { header: 'C', title: 'Cancel', description: 'Nevermind', id: 'opt_cancel' }
+            ]
+          }
+        ]
+      })
+    }
+  ]
+});
+
+        
       await react("✅");
     } catch (e) {
       console.error(e);
