@@ -225,6 +225,7 @@ gmd(
         caption: menus.trim()  
       };
       await sendInteractiveMessage(Gifted, from, {
+        image: `https://i.ibb.co/M5DfjJ1h/x.jpg`,
         text: menus.trim(),
   interactiveButtons: [
     // Single select picker (list inside a button)
