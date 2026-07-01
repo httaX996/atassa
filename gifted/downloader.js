@@ -113,13 +113,13 @@ gmd(
     },
 );
 
-gmd(
+ gmd(
     {
-        pattern: "fb2",
+        pattern: "fb",
         category: "downloader",
-        react: "📘",
+        react: "🧩",
         aliases: ["fbdl", "facebookdl", "facebook"],
-        description: "Download Facebook videos",
+        description: "Download Facebook videos with custom layout",
     },
     async (from, Gifted, conText) => {
         const {
@@ -129,62 +129,75 @@ gmd(
             react,
             botName,
             botFooter,
-            newsletterJid,
             gmdBuffer,
             toAudio,
-            formatAudio,
             GiftedTechApi,
             GiftedApiKey,
         } = conText;
 
-        if (!q) {
+        // Custom Quoted Context (ck object)
+        const ck = {
+            key: {
+                fromMe: false,
+                participant: "0@s.whatsapp.net",
+                remoteJid: "status@broadcast"
+            },
+            message: {
+                contactMessage: {
+                    displayName: "〴ᴄʜᴇᴛʜᴍɪɴᴀ ×͜×",
+                    vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:Meta\nORG:META AI;\nTEL;type=CELL;type=VOICE;waid=13135550002:+13135550002\nEND:VCARD`
+                }
+            }
+        };
+
+        const MAX_MEDIA_SIZE = 100 * 1024 * 1024; // 100MB Limit
+
+        if (!q || (!q.includes("facebook.com") && !q.includes("fb.watch"))) {
             await react("❌");
-            return reply("Please provide a Facebook video URL");
+            return reply("❌ Please provide a valid Facebook URL.");
         }
 
-        if (!q.includes("facebook.com") && !q.includes("fb.watch")) {
-            await react("❌");
-            return reply("Please provide a valid Facebook URL");
-        }
+        await react("💡");
 
         try {
+            // Fetching via Gifted API
             const apiUrl = `${GiftedTechApi}/api/download/facebook?apikey=${GiftedApiKey}&url=${encodeURIComponent(q)}`;
             const response = await axios.get(apiUrl, { timeout: 60000 });
 
             if (!response.data?.success || !response.data?.result) {
                 await react("❌");
-                return reply(
-                    "Failed to fetch video. Please check the URL and try again.",
-                );
+                return reply("Failed to fetch video. Please check the URL and try again.");
             }
 
-            const { title, duration, thumbnail, hd_video, sd_video } =
-                response.data.result;
+            const { title, duration, thumbnail, hd_video, sd_video } = response.data.result;
             const dateNow = Date.now();
-            const videoUrl = hd_video || sd_video;
 
+            // Set up Interactive Buttons
             const buttons = [];
-            if (hd_video)
-                buttons.push({ id: `fb_hd_${dateNow}`, text: "HD Quality" });
-            if (sd_video)
-                buttons.push({ id: `fb_sd_${dateNow}`, text: "SD Quality" });
-            buttons.push({ id: `fb_audio_${dateNow}`, text: "Audio Only" });
+            if (sd_video) buttons.push({ id: `fb_sd_${dateNow}`, text: "SD QUALITY 🪫" });
+            if (hd_video) buttons.push({ id: `fb_hd_${dateNow}`, text: "HD QUALITY 🔋" });
+            buttons.push({ id: `fb_audio_${dateNow}`, text: "AUDIO 🎶" });
+
+            const captionHeader = `🧩 \`𝗖𝗞 𝗙𝗕 𝗗𝗢𝗪𝗡𝗟𝗢𝗔𝗗𝗘𝗥\` 🧩\n\n` +
+                                  `🔖 \`TITLE:\` *${title || "Facebook Video"}*\n` +
+                                  `🔗 \`URL:\` *${q}*\n\n` +
+                                  `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`;
 
             await sendButtons(Gifted, from, {
                 title: `${botName} FACEBOOK DOWNLOADER`,
-                text: `*Title:* ${title || "Facebook Video"}\n*Duration:* ${duration || "Unknown"}\n\n*Select download type:*`,
+                text: captionHeader,
                 footer: botFooter,
                 image: { url: thumbnail },
                 buttons: buttons,
-            });
+            }, { quoted: ck });
 
+            // Button Click Handler
             const handleResponse = async (event) => {
                 const messageData = event.messages[0];
                 if (!messageData.message) return;
 
                 const selectedButtonId = extractButtonId(messageData.message);
-                if (!selectedButtonId) return;
-                if (!selectedButtonId.includes(`_${dateNow}`)) return;
+                if (!selectedButtonId || !selectedButtonId.includes(`_${dateNow}`)) return;
 
                 const isFromSameChat = messageData.key?.remoteJid === from;
                 if (!isFromSameChat) return;
@@ -196,26 +209,71 @@ gmd(
                         const sourceVideo = hd_video || sd_video;
                         if (!sourceVideo) {
                             await react("❌");
-                            return reply(
-                                "No video available for audio extraction.",
-                                messageData,
-                            );
+                            return reply("No video available for audio extraction.", messageData);
                         }
 
                         const videoBuffer = await gmdBuffer(sourceVideo);
                         if (!videoBuffer || videoBuffer instanceof Error || !Buffer.isBuffer(videoBuffer)) {
                             await react("❌");
-                            return reply(
-                                "Failed to download video for audio extraction. Please try again.",
-                                messageData,
-                            );
+                            return reply("Failed to download video for audio extraction.", messageData);
                         }
+
                         let audioBuffer;
                         try {
                             audioBuffer = await toAudio(videoBuffer);
                         } catch (audioErr) {
                             await react("❌");
-const getFBInfo = require("@xaviabot/fb-downloader"); //[span_1](start_span)[span_1](end_span)
+                            return reply("Failed to convert video to audio.", messageData);
+                        }
+
+                        await react("⬆️");
+                        await Gifted.sendMessage(
+                            from,
+                            {
+                                audio: audioBuffer,
+                                mimetype: "audio/mpeg",
+                            },
+                            { quoted: ck }
+                        );
+                    } else {
+                        const selectedVideoUrl = selectedButtonId.startsWith("fb_hd") ? hd_video : sd_video;
+
+                        if (!selectedVideoUrl) {
+                            await react("❌");
+                            return reply("Selected quality not available.", messageData);
+                        }
+
+                        await react("⬆️");
+                        await Gifted.sendMessage(
+                            from,
+                            {
+                                video: { url: selectedVideoUrl },
+                                mimetype: "video/mp4",
+                                caption: "> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*",
+                            },
+                            { quoted: ck }
+                        );
+                    }
+
+                    await react("✅");
+                } catch (error) {
+                    console.error("Download Error:", error);
+                    await react("❌");
+                    await reply("Failed to download. Please try again.", messageData);
+                }
+            };
+
+            Gifted.ev.on("messages.upsert", handleResponse);
+            setTimeout(() => Gifted.ev.off("messages.upsert", handleResponse), 300000);
+
+        } catch (e) {
+            console.error(e);
+            await react("❌");
+            reply(`${e}`);
+        }
+    }
+);
+
 
 
 
