@@ -55,7 +55,7 @@ gmd(
     {
         pattern: "cineck",
         category: "movie",
-        react: "🎬",
+       // react: "🎬",
         aliases: ["cinesubz", "cine"],
         description: "Search movies from CineSubz with Carousel and Buttons",
     },
@@ -68,7 +68,7 @@ gmd(
                 return reply("🎬 Please provide a movie name.\n\nExample:\n.cineck deadpool");
             }
 
-            await react("⚡");
+            await react("🎬");
 
             const dateNow = Date.now();
             const searchUrl = `https://apis.sadas.dev/api/v1/movie/cinesubz/search?q=${encodeURIComponent(q)}&apiKey=ea4d57a2a2db72e0bb3ba58f56b1ff9b`;
@@ -79,8 +79,8 @@ gmd(
                 return reply("❌ No movies found.");
             }
 
-            // 1. සර්ච් රිසල්ට් වලින් මුල් කාඩ් 5 සකස් කිරීම (yts Carousel Style)
-            const moviesSlice = data.data.slice(0, 5);
+            // 1. සර්ච් රිසල්ට් වලින් මුල් කාඩ් 10 සකස් කිරීම (yts Carousel Style)
+            const moviesSlice = data.data.slice(0, 10);
             const cards = await Promise.all(
                 moviesSlice.map(async (movie, index) => {
                     const mediaContent = await generateWAMessageContent(
@@ -120,8 +120,8 @@ gmd(
                         message: {
                             messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
                             interactiveMessage: {
-                                body: { text: `🔍 *𝗖𝗞 𝗖𝗜𝗡𝗘𝗦𝗨𝗕𝗭 𝗦𝗘𝗔𝗥𝗖𝗛* \n\nResults for: *${q}*` },
-                                footer: { text: `📂 Swipe left/right to view results` },
+                                body: { text: `🔍 𝗖𝗞 𝗖𝗜𝗡𝗘𝗦𝗨𝗕𝗭 𝗦𝗘𝗔𝗥𝗖𝗛 \n\nResults for: *${q}*` },
+                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*` },
                                 carouselMessage: { cards },
                             },
                         },
