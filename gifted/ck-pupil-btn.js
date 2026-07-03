@@ -150,7 +150,7 @@ gmd(
                     await react("⏳");
 
                     // Movie Info ලබාගැනීම
-                    const infoUrl = `https://ck-api-v1.vercel.app/movie/pupil/info?url=${encodeURIComponent(selectedMovie.link)}`;
+                    const infoUrl = `https://ck-api-v1.vercel.app/movie/pupil/info?url=${encodeURIComponent(selectedMovie.url)}`;
                     const infoResponse = await axios.get(infoUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
                     
                     const apiResponse = infoResponse.data;
