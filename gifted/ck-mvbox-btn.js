@@ -58,7 +58,6 @@ function formatBytes(bytes, decimals = 2) {
     const dm = decimals < 0 ? 0 : decimals;
     const sizes = ['Bytes', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    // සාමාන්‍ยයෙන් සිනමා පට MB වලින් ඉහළ නිසා Bytes/KB මඟ හැරීමට format කිරීම
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
@@ -82,15 +81,23 @@ gmd(
 
             const dateNow = Date.now();
             const searchUrl = `https://movie-stream-api-nine.vercel.app/api/search?q=${encodeURIComponent(q)}`;
-            const { data } = await axios.get(searchUrl);
+            
+            const response = await axios.get(searchUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
+            });
 
-            if (!data || !data.length) {
+            // API එකෙන් එන results Array එක හරියටම ලබා ගැනීම
+            const moviesList = response.data?.results || [];
+
+            if (!moviesList || !moviesList.length) {
                 await react("❌");
                 return reply("❌ No movies found.");
             }
 
             // 1. සර්ච් රිසල්ට් වලින් මුල් කාඩ් 10 සකස් කිරීම
-            const moviesSlice = data.slice(0, 10);
+            const moviesSlice = moviesList.slice(0, 10);
             const cards = await Promise.all(
                 moviesSlice.map(async (movie, index) => {
                     const mediaContent = await generateWAMessageContent(
@@ -130,7 +137,7 @@ gmd(
                         message: {
                             messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
                             interactiveMessage: {
-                                body: { text: `🔍 𝗠𝗢𝗩𝗜𝗘𝗕𝗢𝗫 𝗦𝗘𝗔𝗥𝗖𝗛 \n\nResults for: *${q}*` },
+                                body: { text: `🔍 𝗖𝗞 𝗠𝗢𝗩𝗜𝗘𝗕𝗢𝗫 𝗦𝗘𝗔𝗥𝗖𝗛 \n\nResults for: *${q}*` },
                                 footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*` },
                                 carouselMessage: { cards },
                             },
@@ -154,7 +161,7 @@ gmd(
 
                     if (msg.key?.remoteJid !== from) return;
 
-                    // මතකය පිරීම වැළැක්වීමට මැච් වූ වහාම ලිස්නර් එක ඉවත් කිරීම
+                    // Memory Leak වැළැක්වීමට මැච් වූ වහාම ලිස්නර් එක අයින් කිරීම
                     Gifted.ev.off("messages.upsert", movieSelectionListener);
 
                     const movieIndex = parseInt(selectedButtonId.split("_")[2]);
