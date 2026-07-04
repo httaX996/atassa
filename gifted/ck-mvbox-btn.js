@@ -51,12 +51,12 @@ async function createThumbnail(url) {
     }
 }
 
-// Bytes ප්‍රමාණය GB හෝ MB වලට හැරවීමේ ශ්‍රිතය
+// නිවැරදි කරන ලද Bytes ප්‍රමාණය පරිවර්තනය කිරීමේ ශ්‍රිතය
 function formatBytes(bytes, decimals = 2) {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'MB', 'GB', 'TB'];
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']; 
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
@@ -207,12 +207,17 @@ gmd(
                     const downloadList = streamResponse.data.list;
                     const dlDateNow = Date.now();
 
-                    // 3. Quality Interactive List බටන් සකස් කිරීම
+                    // 3. Quality Interactive List බටන් සකස් කිරීම (TV Series විස්තර සහිතව)
                     const buttonRows = downloadList.map((dl, i) => {
                         const formattedSize = formatBytes(dl.size);
+                        
+                        // Season සහ Episode අගයන් බිංදුවට වඩා වැඩි නම් (Series එකක් නම්) බටන් එකේ පෙන්වීමට සකස් කිරීම[span_0](start_span)[span_0](end_span)
+                        const isRowSeries = dl.se > 0 || dl.ep > 0;
+                        const rowSeriesInfo = isRowSeries ? `[S${String(dl.se).padStart(2, '0')}E${String(dl.ep).padStart(2, '0')}] ` : '';
+
                         return {
                             header: `Quality: ${dl.resolution}p`,
-                            title: `Download ${dl.resolution}p`,
+                            title: `${rowSeriesInfo}Download ${dl.resolution}p`,
                             description: `Size: ${formattedSize} | Codec: ${dl.codecName || "N/A"}`,
                             id: `mv_link_${movieDetails.id}_${i}_${dlDateNow}`
                         };
@@ -270,13 +275,18 @@ gmd(
                             const thumb = await createThumbnail(movieDetails.poster || selectedMovie.poster);
                             const finalSize = formatBytes(finalQuality.size);
 
+                            // Season සහ Episode අගයන් බිංදුවට වඩා වැඩි නම් විස්තර නමට එකතු කිරීම[span_1](start_span)[span_1](end_span)
+                            const isSeries = finalQuality.se > 0 || finalQuality.ep > 0;
+                            const seriesInfo = isSeries ? `S${String(finalQuality.se).padStart(2, '0')}E${String(finalQuality.ep).padStart(2, '0')} ` : '';
+                            const customFileName = `${movieDetails.title} ${seriesInfo}[${finalQuality.resolution}p].mp4`;
+
                             // Document Message (video/mp4)
                             await Gifted.sendMessage(from, {
                                 document: { url: finalQuality.resourceLink },
                                 mimetype: "video/mp4",
-                                fileName: `${movieDetails.title} [${finalQuality.resolution}p].mp4`,
+                                fileName: customFileName,
                                 jpegThumbnail: thumb,
-                                caption: `🎬 \`${movieDetails.title}\`\n\n🎞️ \`Resolution:\` *${finalQuality.resolution}p*\n📦 \`Size:\` *${finalSize}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+                                caption: `🎬 \`${movieDetails.title}\`\n${isSeries ? `🎞️ \`Season:\` *${finalQuality.se}*\n🎞️ \`Episode:\` *${finalQuality.ep}*\n` : ''}🎞️ \`Resolution:\` *${finalQuality.resolution}p*\n📦 \`Size:\` *${finalSize}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
                             }, { quoted: ck });
 
                             await react("✅");
@@ -308,3 +318,4 @@ gmd(
         }
     }
 );
+
