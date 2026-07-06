@@ -286,7 +286,7 @@ gmd(
                                 mimetype: "video/mp4",
                                 fileName: customFileName,
                                 jpegThumbnail: thumb,
-                                caption: `🎬 \`${movieDetails.title}\`\n` : ''}🎞️ \`Quality :\` *${finalQuality.resolution}p*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+                                caption: `🎬 \`${movieDetails.title}\`\n🎞️ \`Quality :\` *${finalQuality.resolution}p*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
                             }, { quoted: ck });
 
                             await react("✅");
