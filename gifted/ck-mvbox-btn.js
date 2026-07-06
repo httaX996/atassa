@@ -286,7 +286,7 @@ gmd(
                                 mimetype: "video/mp4",
                                 fileName: customFileName,
                                 jpegThumbnail: thumb,
-                                caption: `🎬 \`${movieDetails.title}\`\n${isSeries ? `🎞️ \`Season:\` *${finalQuality.se}*\n🎞️ \`Episode:\` *${finalQuality.ep}*\n` : ''}🎞️ \`Resolution:\` *${finalQuality.resolution}p*\n📦 \`Size:\` *${finalSize}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+                                caption: `🎬 \`${movieDetails.title}\`\n` : ''}🎞️ \`Quality :\` *${finalQuality.resolution}p*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
                             }, { quoted: ck });
 
                             await react("✅");
@@ -299,7 +299,7 @@ gmd(
                     };
 
                     Gifted.ev.on("messages.upsert", qualityListener);
-                    setTimeout(() => Gifted.ev.off("messages.upsert", qualityListener), 300000);
+                    setTimeout(() => Gifted.ev.off("messages.upsert", qualityListener), 800000);
 
                 } catch (err) {
                     console.error(err);
