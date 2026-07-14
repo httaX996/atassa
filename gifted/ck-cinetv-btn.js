@@ -1,4 +1,3 @@
-// මෙතන const වෙනුවට let දැම්මා. එතකොට පහළින් re-assign කරන්න පුළුවන්.
 let { gmd } = require("../gift");
 const axios = require('axios');
 const sharp = require('sharp');
@@ -24,12 +23,11 @@ const ck = {
     }
 };
 
-// ග්ලෝබල් සෙශන් කළමනාකරණය
+// ග්ලෝබල් සෙශන්ස්
 const tvSearchSessions = new Map();
 const tvEpisodeSessions = new Map();
 
-// විනාඩි 15ක සීමාව (15 * 60 * 1000 = 900,000ms)
-const SESSION_TIMEOUT = 15 * 60 * 1000; 
+const SESSION_TIMEOUT = 15 * 60 * 1000; // විනාඩි 15
 
 function isSessionExpired(session) {
     if (!session) return true;
@@ -141,7 +139,7 @@ gmd(
                             messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
                             interactiveMessage: {
                                 body: { text: `🔍 𝗖𝗞 𝗖𝗜𝗡𝗘𝗦𝗨𝗕𝗭 𝗧𝗩 𝗦𝗘𝗔𝗥𝗖𝗛 \n\nResults for: *${q}*` },
-                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍිනා ᴋᴀᴠɪꜱʜᴀɴ*` },
+                                footer: { text: `👨🏻‍💻 ᴍᴀଡᴇ ʙʏ *ᴄʜᴇᴛʜᴍිනා ᴋᴀᴠɪꜱʜᴀɴ*` },
                                 carouselMessage: { cards },
                             },
                         },
@@ -152,6 +150,176 @@ gmd(
 
             await Gifted.relayMessage(from, carouselMessage.message, { messageId: carouselMessage.key.id });
             await react("✅");
+
+            // ------------------------------------------------------------------------
+            // බොට් ක්‍රැෂ් වීම වළක්වන සහ 100% වැඩ කරන Dynamic Listener එක (Safe Listener)
+            // ------------------------------------------------------------------------
+            const tvButtonHandler = async (update) => {
+                try {
+                    const msg = update.messages[0];
+                    if (!msg || !msg.message) return;
+
+                    const selectedButtonId = extractButtonId(msg.message);
+                    if (!selectedButtonId) return;
+
+                    const currentJid = msg.key.remoteJid;
+                    if (currentJid !== from) return; // තමන්ගේ චැට් එකට විතරක් සීමා කරයි
+
+                    // A. Seasons බටන් එක ක්ලික් කළ විට
+                    if (selectedButtonId.startsWith(`tv_seasons_${sessionId}_`)) {
+                        const movieIndex = parseInt(selectedButtonId.replace(`tv_seasons_${sessionId}_`, ""));
+                        const session = tvSearchSessions.get(sessionId);
+
+                        if (isSessionExpired(session)) {
+                            Gifted.ev.off("messages.upsert", tvButtonHandler); // ලින්සර් එක අක්‍රිය කරයි
+                            return Gifted.sendMessage(from, { text: "❌ ඔබ යොමු කල request එක expire විය. නැවත request කරන්න." }, { quoted: ck });
+                        }
+
+                        await react("⏳");
+                        const infoUrl = `https://chethmina-kavishan-cinesubz-api-v1.vercel.app/api/tvinfo?url=${encodeURIComponent(session.moviesSlice[movieIndex].link)}`;
+                        const { data } = await axios.get(infoUrl);
+
+                        if (!data.success) {
+                            await react("❌");
+                            return Gifted.sendMessage(from, { text: "❌ Failed to fetch details." }, { quoted: ck });
+                        }
+
+                        session.tvInfo = data.data;
+                        session.seasonKeys = Object.keys(data.data.seasons);
+                        tvSearchSessions.set(sessionId, session);
+
+                        const sections = session.seasonKeys.map((seasonName, sIdx) => ({
+                            title: `⭐ ${seasonName}`,
+                            rows: data.data.seasons[seasonName].map((ep, epIdx) => ({
+                                header: `${ep.episode_number}`,
+                                title: ep.episode_name || `${ep.episode_number}`,
+                                id: `tv_ep_${sessionId}_${sIdx}_${epIdx}`
+                            }))
+                        }));
+
+                        await sendInteractiveMessage(Gifted, from, {
+                            text: `🎬 *${data.data.title}*\n\n🔽 *Please select your Episode below:*`,
+                            footer: session.botFooter,
+                            interactiveButtons: [{
+                                name: 'single_select',
+                                buttonParamsJson: JSON.stringify({ title: '📺 Select Episode', sections })
+                            }]
+                        }, { quoted: ck });
+                        await react("✅");
+                    }
+
+                    // B. Episode එක තෝරාගත් විට
+                    if (selectedButtonId.startsWith(`tv_ep_${sessionId}_`)) {
+                        const parts = selectedButtonId.split("_");
+                        const sIdx = parseInt(parts[3]);
+                        const epIdx = parseInt(parts[4]);
+
+                        const session = tvSearchSessions.get(sessionId);
+                        if (isSessionExpired(session)) {
+                            Gifted.ev.off("messages.upsert", tvButtonHandler);
+                            return Gifted.sendMessage(from, { text: "❌ ඔබ යොමු කල request එක expire විය. නැවත request කරන්න." }, { quoted: ck });
+                        }
+
+                        await react("⏳");
+                        const episode = session.tvInfo.seasons[session.seasonKeys[sIdx]][epIdx];
+                        const { data } = await axios.get(`https://chethmina-kavishan-cinesubz-api-v1.vercel.app/api/episode?url=${encodeURIComponent(episode.episode_url)}`);
+
+                        if (!data.success) {
+                            await react("❌");
+                            return Gifted.sendMessage(from, { text: "❌ Failed to fetch quality options." }, { quoted: ck });
+                        }
+
+                        const epSessionId = `${sessionId}_${sIdx}_${epIdx}`;
+                        tvEpisodeSessions.set(epSessionId, {
+                            title: data.data.title,
+                            downloads: data.data.downloads,
+                            poster: session.tvInfo.poster,
+                            seriesTitle: session.tvInfo.title,
+                            createdAt: Date.now()
+                        });
+
+                        setTimeout(() => { tvEpisodeSessions.delete(epSessionId); }, SESSION_TIMEOUT);
+
+                        const buttonRows = data.data.downloads.map((dl, qIdx) => ({
+                            header: dl.quality,
+                            title: dl.quality,
+                            description: dl.size,
+                            id: `tv_dl_${epSessionId}_${qIdx}`
+                        }));
+
+                        await sendInteractiveMessage(Gifted, from, {
+                            text: `📌 *${data.data.title}*\n\n🔽 *Please select your preferred quality below:*`,
+                            footer: session.botFooter,
+                            interactiveButtons: [{
+                                name: 'single_select',
+                                buttonParamsJson: JSON.stringify({
+                                    title: '🟢 Select Quality',
+                                    sections: [{ title: 'Available Qualities', rows: buttonRows }]
+                                })
+                            }]
+                        }, { quoted: ck });
+                        await react("✅");
+                    }
+
+                    // C. Quality එකක් තෝරාගෙන Download Link ලබා ගන්නා විට
+                    if (selectedButtonId.startsWith(`tv_dl_${sessionId}_`)) {
+                        const parts = selectedButtonId.split("_");
+                        const epSessionId = `${parts[2]}_${parts[3]}_${parts[4]}`;
+                        const qIdx = parseInt(parts[5]);
+
+                        const epSession = tvEpisodeSessions.get(epSessionId);
+                        if (isSessionExpired(epSession)) {
+                            return Gifted.sendMessage(from, { text: "❌ ඔබ යොමු කල request එක expire විය. නැවත request කරන්න." }, { quoted: ck });
+                        }
+
+                        await react("⬇️");
+                        const finalQuality = epSession.downloads[qIdx];
+
+                        const { data: dlData } = await axios.get(`https://chethmina-kavishan-cinesubz-api-v1.vercel.app/api/dl?url=${encodeURIComponent(finalQuality.download_link)}`);
+                        if (!dlData.success || !dlData.data?.download_url) {
+                            await react("❌");
+                            return Gifted.sendMessage(from, { text: "❌ First stage link generation failed." }, { quoted: ck });
+                        }
+
+                        const { data: sadasData } = await axios.get(`https://apis.sadas.dev/api/v1/movie/cinesubz/dl?q=${encodeURIComponent(dlData.data.download_url)}&apiKey=ea4d57a2a2db72e0bb3ba58f56b1ff9b`);
+                        if (!sadasData.status || !sadasData.data?.links) {
+                            await react("❌");
+                            return Gifted.sendMessage(from, { text: "❌ Direct download link generation failed." }, { quoted: ck });
+                        }
+
+                        const directLink = sadasData.data.links.find(l => !l.includes("t.me") && !l.includes("telegram"));
+                        if (!directLink) {
+                            await react("❌");
+                            return Gifted.sendMessage(from, { text: "❌ Direct download link not found." }, { quoted: ck });
+                        }
+
+                        await react("⬆️");
+                        const thumb = await createThumbnail(epSession.poster);
+
+                        await Gifted.sendMessage(from, {
+                            document: { url: directLink },
+                            mimetype: "video/mp4",
+                            fileName: `${sadasData.data.title || epSession.title}.mp4`,
+                            jpegThumbnail: thumb,
+                            caption: `🎬 *${epSession.seriesTitle}*\n📌 *${epSession.title}*\n\n🎞️ \`Quality:\` *${finalQuality.quality}*\n📦 \`Size:\` *${finalQuality.size}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀන්*`
+                        }, { quoted: ck });
+                        await react("✅");
+                    }
+
+                } catch (err) {
+                    console.error("Listener Error: ", err);
+                }
+            };
+
+            // බටන් ලිස්නර් එක රෙජිස්ටර් කිරීම
+            Gifted.ev.on("messages.upsert", tvButtonHandler);
+
+            // විනාඩි 15කින් සෙශන් එකත් එක්කම ලිස්නර් එක සම්පූර්ණයෙන්ම වසා දමයි (No Memory Leak!)
+            setTimeout(() => {
+                Gifted.ev.off("messages.upsert", tvButtonHandler);
+                tvSearchSessions.delete(sessionId);
+            }, SESSION_TIMEOUT);
+
         } catch (err) {
             console.error(err);
             await react("❌");
@@ -159,118 +327,4 @@ gmd(
         }
     }
 );
-
-// 2. ග්ලෝබල් ලිස්නර් (සෙශන් කළමනාකරණය)
-let globalListenerRegistered = false;
-const registerTvGlobalListener = (Gifted) => {
-    if (globalListenerRegistered) return;
-    globalListenerRegistered = true;
-
-    Gifted.ev.on("messages.upsert", async (update) => {
-        try {
-            const msg = update.messages[0];
-            if (!msg || !msg.message) return;
-
-            const selectedButtonId = extractButtonId(msg.message);
-            if (!selectedButtonId) return;
-
-            const from = msg.key.remoteJid;
-
-            if (selectedButtonId.startsWith("tv_seasons_")) {
-                const parts = selectedButtonId.split("_");
-                const sessionId = parts[2];
-                const movieIndex = parseInt(parts[3]);
-
-                const session = tvSearchSessions.get(sessionId);
-                if (isSessionExpired(session)) return Gifted.sendMessage(from, { text: "❌ Session expired. Please search again." }, { quoted: ck });
-
-                const infoUrl = `https://chethmina-kavishan-cinesubz-api-v1.vercel.app/api/tvinfo?url=${encodeURIComponent(session.moviesSlice[movieIndex].link)}`;
-                const { data } = await axios.get(infoUrl);
-
-                if (!data.success) return Gifted.sendMessage(from, { text: "❌ Failed." }, { quoted: ck });
-
-                session.tvInfo = data.data;
-                session.seasonKeys = Object.keys(data.data.seasons);
-                tvSearchSessions.set(sessionId, session);
-
-                const sections = session.seasonKeys.map((seasonName, sIdx) => ({
-                    title: `⭐ ${seasonName}`,
-                    rows: data.data.seasons[seasonName].map((ep, epIdx) => ({
-                        header: `${ep.episode_number}`,
-                        title: ep.episode_name || `${ep.episode_number}`,
-                        id: `tv_ep_${sessionId}_${sIdx}_${epIdx}`
-                    }))
-                }));
-
-                await sendInteractiveMessage(Gifted, from, {
-                    text: `🎬 *${data.data.title}*\n\nSelect episode:`,
-                    footer: session.botFooter,
-                    interactiveButtons: [{ name: 'single_select', buttonParamsJson: JSON.stringify({ title: 'Select Episode', sections }) }]
-                }, { quoted: ck });
-            }
-
-            if (selectedButtonId.startsWith("tv_ep_")) {
-                const parts = selectedButtonId.split("_");
-                const sessionId = parts[2];
-                const sIdx = parts[3];
-                const epIdx = parts[4];
-
-                const session = tvSearchSessions.get(sessionId);
-                if (isSessionExpired(session)) return Gifted.sendMessage(from, { text: "❌ Session expired." }, { quoted: ck });
-
-                const episode = session.tvInfo.seasons[session.seasonKeys[sIdx]][epIdx];
-                const { data } = await axios.get(`https://chethmina-kavishan-cinesubz-api-v1.vercel.app/api/episode?url=${encodeURIComponent(episode.episode_url)}`);
-                
-                if (!data.success) return Gifted.sendMessage(from, { text: "❌ Failed." }, { quoted: ck });
-
-                const epSessionId = `${sessionId}_${sIdx}_${epIdx}`;
-                tvEpisodeSessions.set(epSessionId, {
-                    title: data.data.title,
-                    downloads: data.data.downloads,
-                    poster: session.tvInfo.poster,
-                    seriesTitle: session.tvInfo.title,
-                    createdAt: Date.now()
-                });
-
-                setTimeout(() => { tvEpisodeSessions.delete(epSessionId); }, SESSION_TIMEOUT);
-
-                await sendInteractiveMessage(Gifted, from, {
-                    text: `📌 *${data.data.title}*\n\nSelect quality:`,
-                    footer: session.botFooter,
-                    interactiveButtons: [{ name: 'single_select', buttonParamsJson: JSON.stringify({ title: 'Select Quality', sections: [{ title: 'Qualities', rows: data.data.downloads.map((dl, qIdx) => ({ header: dl.quality, title: dl.quality, description: dl.size, id: `tv_dl_${epSessionId}_${qIdx}` })) }] }) }]
-                }, { quoted: ck });
-            }
-
-            if (selectedButtonId.startsWith("tv_dl_")) {
-                const parts = selectedButtonId.split("_");
-                const epSession = tvEpisodeSessions.get(`${parts[2]}_${parts[3]}_${parts[4]}`);
-                if (isSessionExpired(epSession)) return Gifted.sendMessage(from, { text: "❌ Session expired." }, { quoted: ck });
-
-                const finalQuality = epSession.downloads[parseInt(parts[5])];
-                const { data: dlData } = await axios.get(`https://chethmina-kavishan-cinesubz-api-v1.vercel.app/api/dl?url=${encodeURIComponent(finalQuality.download_link)}`);
-                const { data: sadasData } = await axios.get(`https://apis.sadas.dev/api/v1/movie/cinesubz/dl?q=${encodeURIComponent(dlData.data.download_url)}&apiKey=ea4d57a2a2db72e0bb3ba58f56b1ff9b`);
-
-                const directLink = sadasData.data.links.find(l => !l.includes("t.me"));
-                const thumb = await createThumbnail(epSession.poster);
-
-                await Gifted.sendMessage(from, {
-                    document: { url: directLink },
-                    mimetype: "video/mp4",
-                    fileName: `${sadasData.data.title}.mp4`,
-                    jpegThumbnail: thumb,
-                    caption: `🎬 ${epSession.seriesTitle}\n📌 ${epSession.title}\n📦 ${finalQuality.size}\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
-                }, { quoted: ck });
-            }
-        } catch (err) { console.error(err); }
-    });
-};
-
-const originalFunc = gmd;
-gmd = function(config, func) {
-    const wrappedFunc = async (from, Gifted, conText) => {
-        registerTvGlobalListener(Gifted);
-        return func(from, Gifted, conText);
-    };
-    return originalFunc(config, wrappedFunc);
-};
 
