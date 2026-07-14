@@ -1,4 +1,4 @@
-const { gmd } = require("../gift"); // Gifted MD structure එකට අනුව වෙනස් කරන ලදි
+const { gmd } = require("../gift");
 const axios = require('axios');
 const sharp = require('sharp');
 const config = require('../config');
@@ -55,7 +55,6 @@ gmd(
     {
         pattern: "cineck",
         category: "movie",
-       // react: "🎬",
         aliases: ["cinesubz", "cine"],
         description: "Search movies from CineSubz with Carousel and Buttons",
     },
@@ -71,16 +70,16 @@ gmd(
             await react("🎬");
 
             const dateNow = Date.now();
-            const searchUrl = `https://apis.sadas.dev/api/v1/movie/cinesubz/search?q=${encodeURIComponent(q)}&apiKey=ea4d57a2a2db72e0bb3ba58f56b1ff9b`;
+            // 1. අලුත් Search API එක
+            const searchUrl = `https://chethmina-kavishan-cinesubz-api-v1.vercel.app/api/search?q=${encodeURIComponent(q)}`;
             const { data } = await axios.get(searchUrl);
 
-            if (!data.status || !data.data || !data.data.length) {
+            if (!data.success || !data.results || !data.results.length) {
                 await react("❌");
                 return reply("❌ No movies found.");
             }
 
-            // 1. සර්ච් රිසල්ට් වලින් මුල් කාඩ් 10 සකස් කිරීම (yts Carousel Style)
-            const moviesSlice = data.data.slice(0, 10);
+            const moviesSlice = data.results.slice(0, 10);
             const cards = await Promise.all(
                 moviesSlice.map(async (movie, index) => {
                     const mediaContent = await generateWAMessageContent(
@@ -95,7 +94,7 @@ gmd(
                             imageMessage: mediaContent.imageMessage,
                         },
                         body: {
-                            text: `⭐ Rating: ${movie.rating || "N/A"}\n💿 Quality: ${movie.quality || "N/A"}\n🎭 Type: ${movie.type || "movies"}`,
+                            text: `✨ Click the button below to fetch available options.`,
                         },
                         footer: { text: `> ${botFooter}` },
                         nativeFlowMessage: {
@@ -121,7 +120,7 @@ gmd(
                             messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
                             interactiveMessage: {
                                 body: { text: `🔍 𝗖𝗞 𝗖𝗜𝗡𝗘𝗦𝗨𝗕𝗭 𝗦𝗘𝗔𝗥𝗖𝗛 \n\nResults for: *${q}*` },
-                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*` },
+                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍිනා ᴋᴀᴠɪꜱʜᴀɴ*` },
                                 carouselMessage: { cards },
                             },
                         },
@@ -133,7 +132,10 @@ gmd(
             await Gifted.relayMessage(from, carouselMessage.message, { messageId: carouselMessage.key.id });
             await react("✅");
 
-            // 2. DOWNLOAD බටන් ක්ලික් එක හැඬ්ල් කරන ලිස්නර් එක
+            // Global/Session tracking Maps (Nested Listeners වල Memory Leaks මඟ හැරීමට)
+            const activeQualitySessions = new Map();
+
+            // 2. DOWNLOAD බටන් ලිස්නර් එක (විනාඩි 10ක් පුරා ක්‍රියාත්මක වන පරිදි 'off' නොකර තබා ගනී)
             const movieSelectionListener = async (update) => {
                 try {
                     const msg = update.messages[0];
@@ -141,7 +143,6 @@ gmd(
 
                     const selectedButtonId = extractButtonId(msg.message);
                     if (!selectedButtonId || !selectedButtonId.includes(`_${dateNow}`) || !selectedButtonId.startsWith("cine_dl_")) return;
-
                     if (msg.key?.remoteJid !== from) return;
 
                     const movieIndex = parseInt(selectedButtonId.split("_")[2]);
@@ -149,26 +150,26 @@ gmd(
 
                     await react("⏳");
 
-                    // Movie Info ලබාගැනීම
-                    const infoUrl = `https://apis.sadas.dev/api/v1/movie/cinesubz/info?q=${encodeURIComponent(selectedMovie.link)}&apiKey=ea4d57a2a2db72e0bb3ba58f56b1ff9b`;
+                    // අලුත් Movie Info API එක
+                    const infoUrl = `https://chethmina-kavishan-cinesubz-api-v1.vercel.app/api/minfo?url=${encodeURIComponent(selectedMovie.link)}`;
                     const infoResponse = await axios.get(infoUrl);
 
-                    if (!infoResponse.data.status) {
+                    if (!infoResponse.data.success) {
                         await react("❌");
                         return reply("❌ Failed to fetch movie details.", msg);
                     }
 
                     const movie = infoResponse.data.data;
 
-                    // Details Caption එක හැදීම
                     let caption = `🎬 \`${movie.title}\`\n\n`;
                     caption += `📅 \`YEAR:\` *${movie.year || "N/A"}*\n`;
-                    caption += `⭐ \`RATING:\` *${movie.imdb_rating || "N/A"}*\n`;
-                    caption += `💿 \`QUALITY:\` *${movie.quality || "N/A"}*\n`;
-                    caption += `🎭 \`CAST:\` ${movie.cast?.slice(0, 5).map(c => `*• ${c.name} (${c.role})*`).join('\n') || "N/A"}\n\n`;
+                    caption += `⭐ \`IMDB:\` *${movie.imdb || "N/A"}*\n`;
+                    caption += `⏳ \`TIME:\` *${movie.time || "N/A"}*\n`;
+                    caption += `🌍 \`COUNTRY:\` *${movie.country || "N/A"}*\n`;
+                    caption += `🎭 \`CAST:\` ${movie.cast?.slice(1, 5).map(c => `*• ${c}*`).join('\n') || "N/A"}\n\n`;
+                    caption += `📝 \`DESC:\` _${movie.description?.slice(0, 150)}..._\n\n`;
                     caption += `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`;
 
-                    // Image එක සහ Details යැවීම (fb style)
                     await Gifted.sendMessage(from, {
                         image: { url: movie.poster || selectedMovie.image },
                         caption: caption
@@ -176,8 +177,8 @@ gmd(
 
                     const dlDateNow = Date.now();
 
-                    // 3. Quality Interactive List බටන් සකස් කිරීම (ytdl style)
-                    const buttonRows = movie.download_links.map((dl, i) => ({
+                    // 3. Quality Interactive List එක සකස් කිරීම
+                    const buttonRows = movie.downloads.map((dl, i) => ({
                         header: `${dl.quality}`,
                         title: `Download ${dl.quality}`,
                         description: `Size: ${dl.size}`,
@@ -194,6 +195,9 @@ gmd(
                         ]
                     };
 
+                    // මෙම නිශ්චිත Quality list එකට අදාළ දත්ත Save කර ගැනීම
+                    activeQualitySessions.set(dlDateNow, { movie, downloads: movie.downloads });
+
                     await sendInteractiveMessage(Gifted, from, {
                         text: '🔽 *Please select your preferred movie quality below:*',
                         footer: botFooter,
@@ -207,75 +211,93 @@ gmd(
 
                     await react("✅");
 
-                    // 4. අවසාන Quality බටන් එක ක්ලික් කල පසු ඩොකියුමන්ට් එකක් ලෙස යැවීම
-                    const qualityListener = async (update2) => {
-                        try {
-                            const msg2 = update2.messages[0];
-                            if (!msg2.message) return;
+                } catch (err) {
+                    console.error(err);
+                    await react("❌");
+                }
+            };
 
-                            const selectedQualityId = extractButtonId(msg2.message);
-                            if (!selectedQualityId || !selectedQualityId.includes(`_${dlDateNow}`) || !selectedQualityId.startsWith("cine_link_")) return;
+            // 4. Quality බටන් එක ක්ලික් කළ පසු ඩොකියුමන්ට් එකක් ලෙස යැවීමේ ලිස්නර් එක
+            const qualityListener = async (update2) => {
+                try {
+                    const msg2 = update2.messages[0];
+                    if (!msg2.message) return;
 
-                            if (msg2.key?.remoteJid !== from) return;
+                    const selectedQualityId = extractButtonId(msg2.message);
+                    if (!selectedQualityId || !selectedQualityId.startsWith("cine_link_")) return;
+                    if (msg2.key?.remoteJid !== from) return;
 
-                            const parts = selectedQualityId.split("_");
-                            const qIndex = parseInt(parts[3]);
-                            const finalQuality = movie.download_links[qIndex];
+                    const parts = selectedQualityId.split("_");
+                    const dlTimestamp = parseInt(parts[4]); // dlDateNow එක ලබා ගැනීම
 
-                            await react("⬇️");
+                    // Session එක වලංගු එකක්දැයි බැලීම
+                    if (!activeQualitySessions.has(dlTimestamp)) return;
+                    const session = activeQualitySessions.get(dlTimestamp);
 
-                            const downloadUrl = `https://apis.sadas.dev/api/v1/movie/cinesubz/dl?q=${encodeURIComponent(finalQuality.final_link)}&apiKey=ea4d57a2a2db72e0bb3ba58f56b1ff9b`;
-                            const downloadResponse = await axios.get(downloadUrl);
+                    const qIndex = parseInt(parts[3]);
+                    const finalQuality = session.downloads[qIndex];
 
-                            if (!downloadResponse.data.status) {
-                                await react("❌");
-                                return reply("❌ Download link not found.", msg2);
-                            }
+                    await react("⬇️");
 
-                            const links = downloadResponse.data.data?.links || [];
-                            const directLink = links.find(link => !link.includes("t.me") && !link.includes("telegram"));
+                    // අලුත් dl API එකට යැවීම
+                    const dlUrl = `https://chethmina-kavishan-cinesubz-api-v1.vercel.app/api/dl?url=${encodeURIComponent(finalQuality.download_link)}`;
+                    const dlResponse = await axios.get(dlUrl);
 
-                            if (!directLink) {
-                                await react("❌");
-                                return reply("❌ Direct download link not found.", msg2);
-                            }
+                    if (!dlResponse.data.success || !dlResponse.data.data?.download_url) {
+                        await react("❌");
+                        return reply("❌ First stage download link not found.", msg2);
+                    }
 
-                            await react("⬆️");
-                            const thumb = await createThumbnail(movie.poster || selectedMovie.image);
+                    const initialDlUrl = dlResponse.data.data.download_url;
 
-                            // Document Message (video/mp4)
-                            await Gifted.sendMessage(from, {
-                                document: { url: directLink },
-                                mimetype: "video/mp4",
-                                fileName: `${movie.title} [${finalQuality.quality}].mp4`,
-                                jpegThumbnail: thumb,
-                                caption: `🎬 \`${movie.title}\`\n\n🎞️ \`Quality:\` *${finalQuality.quality}*\n📦 \`Size:\` *${finalQuality.size}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
-                            }, { quoted: ck });
+                    // sadas dev api එකට download_url එක දැමීම
+                    const finalSadasUrl = `https://apis.sadas.dev/api/v1/movie/cinesubz/dl?q=${encodeURIComponent(initialDlUrl)}&apiKey=ea4d57a2a2db72e0bb3ba58f56b1ff9b`;
+                    const sadasResponse = await axios.get(finalSadasUrl);
 
-                            await react("✅");
-                            
-                            // වැඩේ සාර්ථකව අවසන් වූ නිසා ලිස්නර් එක අයින් කිරීම
-                            Gifted.ev.off("messages.upsert", qualityListener);
+                    if (!sadasResponse.data.status || !sadasResponse.data.data?.links) {
+                        await react("❌");
+                        return reply("❌ Direct download link could not be generated.", msg2);
+                    }
 
-                        } catch (err) {
-                            console.error(err);
-                            await react("❌");
-                            reply("❌ Error while downloading document.", update2.messages[0]);
-                        }
-                    };
+                    const links = sadasResponse.data.data.links || [];
+                    // ටෙලිග්‍රෑම් නැති ලින්ක් එක පෙරීම
+                    const directLink = links.find(link => !link.includes("t.me") && !link.includes("telegram"));
 
-                    Gifted.ev.on("messages.upsert", qualityListener);
-                    setTimeout(() => Gifted.ev.off("messages.upsert", qualityListener), 300000);
+                    if (!directLink) {
+                        await react("❌");
+                        return reply("❌ Direct download link not found (Filtered Telegram out).", msg2);
+                    }
+
+                    await react("⬆️");
+                    const thumb = await createThumbnail(session.movie.poster);
+
+                    // Document එකක් ලෙස වීඩියෝව යැවීම
+                    await Gifted.sendMessage(from, {
+                        document: { url: directLink },
+                        mimetype: "video/mp4",
+                        fileName: `${sadasResponse.data.data.title || session.movie.title}.mp4`,
+                        jpegThumbnail: thumb,
+                        caption: `🎬 \`${session.movie.title}\`\n\n🎞️ \`Quality:\` *${finalQuality.quality}*\n📦 \`Size:\` *${finalQuality.size}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+                    }, { quoted: ck });
+
+                    await react("✅");
 
                 } catch (err) {
                     console.error(err);
                     await react("❌");
-                    reply("❌ Error while processing selection.");
                 }
             };
 
+            // Listeners දෙකම Register කිරීම
             Gifted.ev.on("messages.upsert", movieSelectionListener);
-            setTimeout(() => Gifted.ev.off("messages.upsert", movieSelectionListener), 300000);
+            Gifted.ev.on("messages.upsert", qualityListener);
+
+            // විනාඩි 10කට (මිලිතත්පර 600,000) පසු Listeners දෙකම සම්පූර්ණයෙන් Clear කර දැමීම
+            setTimeout(() => {
+                Gifted.ev.off("messages.upsert", movieSelectionListener);
+                Gifted.ev.off("messages.upsert", qualityListener);
+                activeQualitySessions.clear();
+            }, 600000);
 
         } catch (err) {
             console.error(err);
@@ -284,3 +306,4 @@ gmd(
         }
     }
 );
+
