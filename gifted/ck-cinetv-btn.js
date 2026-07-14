@@ -1,4 +1,5 @@
-const { gmd } = require("../gift");
+// මෙතන const වෙනුවට let දැම්මා. එතකොට පහළින් re-assign කරන්න පුළුවන්.
+let { gmd } = require("../gift");
 const axios = require('axios');
 const sharp = require('sharp');
 const config = require('../config');
@@ -17,7 +18,7 @@ const ck = {
     },
     message: {
         contactMessage: {
-            displayName: "㴝ᴄʜᴇᴛʜᴍɪɴᴀ ×͜×",
+            displayName: "〴ᴄʜᴇᴛʜᴍɪɴᴀ ×͜×",
             vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:Meta\nORG:META AI;\nTEL;type=CELL;type=VOICE;waid=13135550002:+13135550002\nEND:VCARD`
         }
     }
