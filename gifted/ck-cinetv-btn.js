@@ -62,6 +62,17 @@ async function createThumbnail(url) {
     }
 }
 
+// Helper to safely fetch image as Buffer to avoid WA URL download errors
+async function getImageBuffer(url) {
+    try {
+        const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
+        return Buffer.from(response.data);
+    } catch (e) {
+        console.error("Image Fetch Error:", e.message);
+        return null;
+    }
+}
+
 // 1. ප්‍රධාන CINETV කමාන්ඩ් එක
 gmd(
     {
@@ -139,7 +150,7 @@ gmd(
                             messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
                             interactiveMessage: {
                                 body: { text: `🔍 𝗖𝗞 𝗖𝗜𝗡𝗘𝗦𝗨𝗕𝗭 𝗧𝗩 𝗦𝗘𝗔𝗥𝗖𝗛 \n\nResults for: *${q}*` },
-                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*` },
+                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀන්*` },
                                 carouselMessage: { cards },
                             },
                         },
@@ -165,7 +176,7 @@ gmd(
                     const currentJid = msg.key.remoteJid;
                     if (currentJid !== from) return;
 
-                    // A. Seasons බටන් එක ක්ලික් කළ විට (Details + Episode Selector)
+                    // A. Seasons බටන් එක ක්ලික් කළ විට
                     if (selectedButtonId.startsWith(`tv_seasons_${sessionId}_`)) {
                         const movieIndex = parseInt(selectedButtonId.replace(`tv_seasons_${sessionId}_`, ""));
                         const session = tvSearchSessions.get(sessionId);
@@ -189,12 +200,12 @@ gmd(
                         session.seasonKeys = Object.keys(tvInfo.seasons);
                         tvSearchSessions.set(sessionId, session);
 
-                        // 1. Details Caption එක සකස් කිරීම
+                        // Variables සැකසීම
                         const tvTitle = tvInfo.title || "Unknown Title";
                         const tvYear = tvInfo.year || "N/A";
                         const tvImdb = tvInfo.imdb || "N/A";
                         const tvCountry = tvInfo.country || "N/A";
-                        const tvPoster = tvInfo.poster || tvInfo.image || config.IMG_URL;
+                        const tvPosterUrl = tvInfo.poster || tvInfo.image || config.IMG_URL;
                         
                         // Cast formatting
                         let tvCast = "N/A";
@@ -216,20 +227,29 @@ gmd(
                         detailsCaption += `🌍 \`COUNTRY:\` *${tvCountry}*\n`;
                         detailsCaption += `🎭 \`CAST:\` \n${tvCast}\n\n`;
                         detailsCaption += `📝 \`DESC:\` _${tvDesc}_\n\n`;
-                        detailsCaption += `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`;
+                        detailsCaption += `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀන්*`;
 
-                        // Details Message එක Poster එකත් එක්ක මුලින්ම සෙන්ඩ් කිරීම
+                        // 1. මුලින්ම Poster එක සහ Details යවනවා (Buffer ක්‍රමයට)
                         try {
-                            await Gifted.sendMessage(from, {
-                                image: { url: tvPoster },
-                                caption: detailsCaption
-                            }, { quoted: ck });
+                            const posterBuffer = await getImageBuffer(tvPosterUrl);
+                            if (posterBuffer) {
+                                await Gifted.sendMessage(from, {
+                                    image: posterBuffer,
+                                    caption: detailsCaption
+                                }, { quoted: ck });
+                            } else {
+                                // Buffer එක ගන්න බැරි වුනොත් Default image එක url එකක් විදියට ට්‍රයි කරයි
+                                await Gifted.sendMessage(from, {
+                                    image: { url: config.IMG_URL },
+                                    caption: detailsCaption
+                                }, { quoted: ck });
+                            }
                         } catch (e) {
-                            // Poster URL එකේ මොකක් හරි අවුලක් තිබ්බොත් Text විතරක් සෙන්ඩ් කරනවා
+                            console.log("Image send failed, sending text details instead:", e);
                             await Gifted.sendMessage(from, { text: detailsCaption }, { quoted: ck });
                         }
 
-                        // 2. Episode Selector ලිස්ට් එක සකසනවා
+                        // 2. Episode Selector එක සකසනවා
                         const sections = session.seasonKeys.map((seasonName, sIdx) => ({
                             title: `⭐ ${seasonName}`,
                             rows: tvInfo.seasons[seasonName].map((ep, epIdx) => ({
@@ -239,7 +259,7 @@ gmd(
                             }))
                         }));
 
-                        // Episode Selector එක සෙන්ඩ් කිරීම
+                        // Selector එක යවනවා
                         await sendInteractiveMessage(Gifted, from, {
                             text: `📺 *${tvTitle}*\n\n🔽 *පහතින් ඔබට අවශ්‍ය Episode එකක් තෝරා ගන්න:*`,
                             footer: session.botFooter,
@@ -344,7 +364,7 @@ gmd(
                             mimetype: "video/mp4",
                             fileName: `${sadasData.data.title || epSession.title}.mp4`,
                             jpegThumbnail: thumb,
-                            caption: `🎬 *${epSession.seriesTitle}*\n📌 *${epSession.title}*\n\n🎞️ \`Quality:\` *${finalQuality.quality}*\n📦 \`Size:\` *${finalQuality.size}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+                            caption: `🎬 *${epSession.seriesTitle}*\n📌 *${epSession.title}*\n\n🎞️ \`Quality:\` *${finalQuality.quality}*\n📦 \`Size:\` *${finalQuality.size}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀන්*`
                         }, { quoted: ck });
                         await react("✅");
                     }
