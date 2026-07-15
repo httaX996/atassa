@@ -122,7 +122,7 @@ gmd(
                             buttons: [{
                                 name: "quick_reply",
                                 buttonParamsJson: JSON.stringify({
-                                    display_text: "📥 SELECT SEASONS",
+                                    display_text: "📥 DOWNLOAD",
                                     id: `tv_seasons_${sessionId}_${index}`
                                 }),
                             }],
@@ -139,7 +139,7 @@ gmd(
                             messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
                             interactiveMessage: {
                                 body: { text: `🔍 𝗖𝗞 𝗖𝗜𝗡𝗘𝗦𝗨𝗕𝗭 𝗧𝗩 𝗦𝗘𝗔𝗥𝗖𝗛 \n\nResults for: *${q}*` },
-                                footer: { text: `👨🏻‍💻 ᴍᴀଡᴇ ʙʏ *ᴄʜᴇᴛʜᴍිනා ᴋᴀᴠɪꜱʜᴀɴ*` },
+                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*` },
                                 carouselMessage: { cards },
                             },
                         },
@@ -151,9 +151,9 @@ gmd(
             await Gifted.relayMessage(from, carouselMessage.message, { messageId: carouselMessage.key.id });
             await react("✅");
 
-            // ------------------------------------------------------------------------
-            // බොට් ක්‍රැෂ් වීම වළක්වන සහ 100% වැඩ කරන Dynamic Listener එක (Safe Listener)
-            // ------------------------------------------------------------------------
+            // ----------------------------------------------------
+            // 2. 100% වැඩ කරන Safe Dynamic Listener
+            // ----------------------------------------------------
             const tvButtonHandler = async (update) => {
                 try {
                     const msg = update.messages[0];
@@ -163,15 +163,15 @@ gmd(
                     if (!selectedButtonId) return;
 
                     const currentJid = msg.key.remoteJid;
-                    if (currentJid !== from) return; // තමන්ගේ චැට් එකට විතරක් සීමා කරයි
+                    if (currentJid !== from) return;
 
-                    // A. Seasons බටන් එක ක්ලික් කළ විට
+                    // A. SELECT SEASONS ක්ලික් කරපු ගමන් මුලින්ම Details සහ ඊට පස්සේ Episode List එක
                     if (selectedButtonId.startsWith(`tv_seasons_${sessionId}_`)) {
                         const movieIndex = parseInt(selectedButtonId.replace(`tv_seasons_${sessionId}_`, ""));
                         const session = tvSearchSessions.get(sessionId);
 
                         if (isSessionExpired(session)) {
-                            Gifted.ev.off("messages.upsert", tvButtonHandler); // ලින්සර් එක අක්‍රිය කරයි
+                            Gifted.ev.off("messages.upsert", tvButtonHandler);
                             return Gifted.sendMessage(from, { text: "❌ ඔබ යොමු කල request එක expire විය. නැවත request කරන්න." }, { quoted: ck });
                         }
 
@@ -184,21 +184,39 @@ gmd(
                             return Gifted.sendMessage(from, { text: "❌ Failed to fetch details." }, { quoted: ck });
                         }
 
-                        session.tvInfo = data.data;
-                        session.seasonKeys = Object.keys(data.data.seasons);
+                        const movieData = data.data;
+                        session.tvInfo = movieData;
+                        session.seasonKeys = Object.keys(movieData.seasons);
                         tvSearchSessions.set(sessionId, session);
 
+                        // Details Caption එක සකස් කිරීම
+                        let detailsCaption = `🎬 \`${movieData.title}\`\n\n`;
+                        detailsCaption += `📅 \`YEAR:\` *${movieData.year || "N/A"}*\n`;
+                        detailsCaption += `⭐ \`IMDB:\` *${movieData.imdb || "N/A"}*\n`;
+                        detailsCaption += `🌍 \`COUNTRY:\` *${movieData.country || "N/A"}*\n`;
+                        detailsCaption += `🎭 \`CAST:\` ${movieData.cast?.slice(1, 5).map(c => `*• ${c}*`).join('\n') || "N/A"}\n\n`;
+                        detailsCaption += `📝 \`DESC:\` _${movieData.description?.slice(0, 200)}..._\n\n`;
+                        detailsCaption += `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`;
+
+                        // 1. මුලින්ම Poster එක සහ Details යවනවා
+                        await Gifted.sendMessage(from, {
+                            image: { url: movieData.poster || session.moviesSlice[movieIndex].image },
+                            caption: detailsCaption
+                        }, { quoted: ck });
+
+                        // 2. ඊළඟට Seasons & Episodes තෝරන්න ලිස්ට් එක සකසනවා
                         const sections = session.seasonKeys.map((seasonName, sIdx) => ({
                             title: `⭐ ${seasonName}`,
-                            rows: data.data.seasons[seasonName].map((ep, epIdx) => ({
+                            rows: movieData.seasons[seasonName].map((ep, epIdx) => ({
                                 header: `${ep.episode_number}`,
                                 title: ep.episode_name || `${ep.episode_number}`,
                                 id: `tv_ep_${sessionId}_${sIdx}_${epIdx}`
                             }))
                         }));
 
+                        // 3. ලිස්ට් මැසේජ් එක යවනවා
                         await sendInteractiveMessage(Gifted, from, {
-                            text: `🎬 *${data.data.title}*\n\n🔽 *Please select your Episode below:*`,
+                            text: `📺 *${movieData.title}*\n\n🔽 *පහතින් ඔබට අවශ්‍ය Episode එකක් තෝරා ගන්න:*`,
                             footer: session.botFooter,
                             interactiveButtons: [{
                                 name: 'single_select',
@@ -208,7 +226,7 @@ gmd(
                         await react("✅");
                     }
 
-                    // B. Episode එක තෝරාගත් විට
+                    // B. Episode එකක් තෝරාගත් විට Quality List එක යැවීම
                     if (selectedButtonId.startsWith(`tv_ep_${sessionId}_`)) {
                         const parts = selectedButtonId.split("_");
                         const sIdx = parseInt(parts[3]);
@@ -261,7 +279,7 @@ gmd(
                         await react("✅");
                     }
 
-                    // C. Quality එකක් තෝරාගෙන Download Link ලබා ගන්නා විට
+                    // C. Quality සිලෙක්ට් කර ඩවුන්ලෝඩ් ලබා ගැනීම
                     if (selectedButtonId.startsWith(`tv_dl_${sessionId}_`)) {
                         const parts = selectedButtonId.split("_");
                         const epSessionId = `${parts[2]}_${parts[3]}_${parts[4]}`;
@@ -301,7 +319,7 @@ gmd(
                             mimetype: "video/mp4",
                             fileName: `${sadasData.data.title || epSession.title}.mp4`,
                             jpegThumbnail: thumb,
-                            caption: `🎬 *${epSession.seriesTitle}*\n📌 *${epSession.title}*\n\n🎞️ \`Quality:\` *${finalQuality.quality}*\n📦 \`Size:\` *${finalQuality.size}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀන්*`
+                            caption: `🎬 *${epSession.seriesTitle}*\n📌 *${epSession.title}*\n\n🎞️ \`Quality:\` *${finalQuality.quality}*\n📦 \`Size:\` *${finalQuality.size}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
                         }, { quoted: ck });
                         await react("✅");
                     }
@@ -314,7 +332,7 @@ gmd(
             // බටන් ලිස්නර් එක රෙජිස්ටර් කිරීම
             Gifted.ev.on("messages.upsert", tvButtonHandler);
 
-            // විනාඩි 15කින් සෙශන් එකත් එක්කම ලිස්නර් එක සම්පූර්ණයෙන්ම වසා දමයි (No Memory Leak!)
+            // විනාඩි 15කින් ලිස්නර් එක Clear කිරීම
             setTimeout(() => {
                 Gifted.ev.off("messages.upsert", tvButtonHandler);
                 tvSearchSessions.delete(sessionId);
@@ -327,4 +345,3 @@ gmd(
         }
     }
 );
-
