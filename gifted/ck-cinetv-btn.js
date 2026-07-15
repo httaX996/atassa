@@ -122,8 +122,8 @@ gmd(
                             buttons: [{
                                 name: "quick_reply",
                                 buttonParamsJson: JSON.stringify({
-                                    display_text: "📥 DOWNLOAD", // බටන් එකේ text එක "DOWNLOAD" ලෙස හැදුවා
-                                    id: `tv_seasons_${sessionId}_${index}` // ID එක බටන් ලිස්නර් එකට ගැලපෙන්න හැදුවා
+                                    display_text: "📥 DOWNLOAD",
+                                    id: `tv_seasons_${sessionId}_${index}`
                                 }),
                             }],
                         },
@@ -139,7 +139,7 @@ gmd(
                             messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
                             interactiveMessage: {
                                 body: { text: `🔍 𝗖𝗞 𝗖𝗜𝗡𝗘𝗦𝗨𝗕𝗭 𝗧𝗩 𝗦𝗘𝗔𝗥𝗖𝗛 \n\nResults for: *${q}*` },
-                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍිනා ᴋᴀᴠɪꜱʜᴀන්*` },
+                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*` },
                                 carouselMessage: { cards },
                             },
                         },
@@ -152,7 +152,7 @@ gmd(
             await react("✅");
 
             // ----------------------------------------------------
-            // 2. 100% වැඩ කරන Safe Dynamic Listener
+            // 2. Safe Dynamic Listener (No Crash, Auto-fallback)
             // ----------------------------------------------------
             const tvButtonHandler = async (update) => {
                 try {
@@ -165,7 +165,7 @@ gmd(
                     const currentJid = msg.key.remoteJid;
                     if (currentJid !== from) return;
 
-                    // A. DOWNLOAD (SELECT SEASONS) ක්ලික් කරපු ගමන් මුලින්ම Details සහ ඊට පස්සේ Episode List එක
+                    // A. DOWNLOAD බටන් එක ක්ලික් කළ විට
                     if (selectedButtonId.startsWith(`tv_seasons_${sessionId}_`)) {
                         const movieIndex = parseInt(selectedButtonId.replace(`tv_seasons_${sessionId}_`, ""));
                         const session = tvSearchSessions.get(sessionId);
@@ -179,53 +179,81 @@ gmd(
                         const infoUrl = `https://chethmina-kavishan-cinesubz-api-v1.vercel.app/api/tvinfo?url=${encodeURIComponent(session.moviesSlice[movieIndex].link)}`;
                         const { data } = await axios.get(infoUrl);
 
-                        if (!data.success) {
+                        // Debugging සදහා: API Response එක console එකට ගන්නවා.
+                        console.log("CINETV INFO API RESPONSE:", JSON.stringify(data, null, 2));
+
+                        if (!data || (!data.success && !data.data)) {
                             await react("❌");
-                            return Gifted.sendMessage(from, { text: "❌ Failed to fetch details." }, { quoted: ck });
+                            return Gifted.sendMessage(from, { text: "❌ Failed to fetch details from server." }, { quoted: ck });
                         }
 
-                        const movieData = data.data;
+                        // API Response එකේ data තියෙන තැන හරියට ගමු (data.data හෝ කෙලින්ම data)
+                        const movieData = data.data || data;
                         session.tvInfo = movieData;
-                        session.seasonKeys = Object.keys(movieData.seasons);
+                        
+                        // සේසන්ස් ලිස්ට් එකක් තියෙනවද කියලා බලනවා
+                        const seasonsObj = movieData.seasons || {};
+                        session.seasonKeys = Object.keys(seasonsObj);
                         tvSearchSessions.set(sessionId, session);
 
-                        // Data හිස් වුණොත් crash වීම වැළැක්වීමට safe check එකක් දමා ඇත
-                        let detailsCaption = `🎬 *${movieData.title || "N/A"}*\n\n`;
-                        detailsCaption += `📅 \`YEAR:\` *${movieData.year || "N/A"}*\n`;
-                        detailsCaption += `⭐ \`IMDB:\` *${movieData.imdb || "N/A"}*\n`;
-                        detailsCaption += `🌍 \`COUNTRY:\` *${movieData.country || "N/A"}*\n`;
+                        if (session.seasonKeys.length === 0) {
+                            await react("❌");
+                            return Gifted.sendMessage(from, { text: "❌ No seasons found for this TV series." }, { quoted: ck });
+                        }
+
+                        // Safe Values assign කිරීම (API එකෙන් missing data ආවොත් crash වීම වැලැක්වීමට)
+                        const tvTitle = movieData.title || session.moviesSlice[movieIndex].title || "Unknown Title";
+                        const tvYear = movieData.year || "N/A";
+                        const tvImdb = movieData.imdb || "N/A";
+                        const tvCountry = movieData.country || "N/A";
+                        const tvPoster = movieData.poster || movieData.image || session.moviesSlice[movieIndex].image || config.IMG_URL;
                         
+                        let tvCast = "N/A";
                         if (movieData.cast && Array.isArray(movieData.cast)) {
-                            detailsCaption += `🎭 \`CAST:\` ${movieData.cast.slice(0, 4).map(c => `*• ${c}*`).join('\n')}\n\n`;
-                        } else {
-                            detailsCaption += `🎭 \`CAST:\` N/A\n\n`;
+                            tvCast = movieData.cast.slice(0, 4).map(c => `*• ${c}*`).join('\n');
+                        } else if (typeof movieData.cast === 'string') {
+                            tvCast = movieData.cast;
                         }
-                        
+
+                        let tvDesc = "No description available.";
                         if (movieData.description) {
-                            detailsCaption += `📝 \`DESC:\` _${movieData.description.slice(0, 200)}..._\n\n`;
+                            tvDesc = movieData.description.length > 200 ? movieData.description.slice(0, 200) + "..." : movieData.description;
                         }
-                        
-                        detailsCaption += `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀන්*`;
 
-                        // 1. මුලින්ම Poster එක සහ Details යවනවා
-                        await Gifted.sendMessage(from, {
-                            image: { url: movieData.poster || session.moviesSlice[movieIndex].image || config.IMG_URL },
-                            caption: detailsCaption
-                        }, { quoted: ck });
+                        // Details Caption එක සකස් කිරීම
+                        let detailsCaption = `🎬 *${tvTitle}*\n\n`;
+                        detailsCaption += `📅 \`YEAR:\` *${tvYear}*\n`;
+                        detailsCaption += `⭐ \`IMDB:\` *${tvImdb}*\n`;
+                        detailsCaption += `🌍 \`COUNTRY:\` *${tvCountry}*\n`;
+                        detailsCaption += `🎭 \`CAST:\` \n${tvCast}\n\n`;
+                        detailsCaption += `📝 \`DESC:\` _${tvDesc}_\n\n`;
+                        detailsCaption += `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`;
 
-                        // 2. ඊළඟට Seasons & Episodes තෝරන්න ලිස්ට් එක සකසනවා
+                        // 1. මුලින්ම Poster එක සහ Details යවනවා (Error Safe)
+                        try {
+                            await Gifted.sendMessage(from, {
+                                image: { url: tvPoster },
+                                caption: detailsCaption
+                            }, { quoted: ck });
+                        } catch (imgErr) {
+                            console.error("Poster sending failed, falling back to text only:", imgErr);
+                            // Poster එක යවන්න බැරි වුනොත් (Invalid URL) Text එක විතරක් යවනවා
+                            await Gifted.sendMessage(from, { text: detailsCaption }, { quoted: ck });
+                        }
+
+                        // 2. Seasons & Episodes තෝරන්න ලිස්ට් එක සකසනවා
                         const sections = session.seasonKeys.map((seasonName, sIdx) => ({
                             title: `⭐ ${seasonName}`,
-                            rows: movieData.seasons[seasonName].map((ep, epIdx) => ({
-                                header: `${ep.episode_number}`,
-                                title: ep.episode_name || `${ep.episode_number}`,
+                            rows: (seasonsObj[seasonName] || []).map((ep, epIdx) => ({
+                                header: `${ep.episode_number || epIdx + 1}`,
+                                title: ep.episode_name || `Episode ${ep.episode_number || epIdx + 1}`,
                                 id: `tv_ep_${sessionId}_${sIdx}_${epIdx}`
                             }))
                         }));
 
                         // 3. ලිස්ට් මැසේජ් එක යවනවා
                         await sendInteractiveMessage(Gifted, from, {
-                            text: `📺 *${movieData.title}*\n\n🔽 *පහතින් ඔබට අවශ්‍ය Episode එකක් තෝරා ගන්න:*`,
+                            text: `📺 *${tvTitle}*\n\n🔽 *පහතින් ඔබට අවශ්‍ය Episode එකක් තෝරා ගන්න:*`,
                             footer: session.botFooter,
                             interactiveButtons: [{
                                 name: 'single_select',
@@ -248,34 +276,44 @@ gmd(
                         }
 
                         await react("⏳");
-                        const episode = session.tvInfo.seasons[session.seasonKeys[sIdx]][epIdx];
+                        const currentSeason = session.seasonKeys[sIdx];
+                        const episode = session.tvInfo.seasons[currentSeason][epIdx];
+                        
                         const { data } = await axios.get(`https://chethmina-kavishan-cinesubz-api-v1.vercel.app/api/episode?url=${encodeURIComponent(episode.episode_url)}`);
 
-                        if (!data.success) {
+                        if (!data || (!data.success && !data.data)) {
                             await react("❌");
                             return Gifted.sendMessage(from, { text: "❌ Failed to fetch quality options." }, { quoted: ck });
                         }
 
+                        const epData = data.data || data;
                         const epSessionId = `${sessionId}_${sIdx}_${epIdx}`;
+                        
                         tvEpisodeSessions.set(epSessionId, {
-                            title: data.data.title,
-                            downloads: data.data.downloads,
-                            poster: session.tvInfo.poster,
-                            seriesTitle: session.tvInfo.title,
+                            title: epData.title || `Episode ${episode.episode_number}`,
+                            downloads: epData.downloads || [],
+                            poster: session.tvInfo.poster || session.tvInfo.image || config.IMG_URL,
+                            seriesTitle: session.tvInfo.title || "TV Series",
                             createdAt: Date.now()
                         });
 
                         setTimeout(() => { tvEpisodeSessions.delete(epSessionId); }, SESSION_TIMEOUT);
 
-                        const buttonRows = data.data.downloads.map((dl, qIdx) => ({
-                            header: dl.quality,
-                            title: dl.quality,
-                            description: dl.size,
+                        const downloadList = epData.downloads || [];
+                        if (downloadList.length === 0) {
+                            await react("❌");
+                            return Gifted.sendMessage(from, { text: "❌ No download links found for this episode." }, { quoted: ck });
+                        }
+
+                        const buttonRows = downloadList.map((dl, qIdx) => ({
+                            header: dl.quality || "Unknown Quality",
+                            title: dl.quality || "Download Link",
+                            description: dl.size || "N/A",
                             id: `tv_dl_${epSessionId}_${qIdx}`
                         }));
 
                         await sendInteractiveMessage(Gifted, from, {
-                            text: `📌 *${data.data.title}*\n\n🔽 *Please select your preferred quality below:*`,
+                            text: `📌 *${epData.title || "Episode Details"}*\n\n🔽 *Please select your preferred quality below:*`,
                             footer: session.botFooter,
                             interactiveButtons: [{
                                 name: 'single_select',
@@ -303,13 +341,13 @@ gmd(
                         const finalQuality = epSession.downloads[qIdx];
 
                         const { data: dlData } = await axios.get(`https://chethmina-kavishan-cinesubz-api-v1.vercel.app/api/dl?url=${encodeURIComponent(finalQuality.download_link)}`);
-                        if (!dlData.success || !dlData.data?.download_url) {
+                        if (!dlData || !dlData.success || !dlData.data?.download_url) {
                             await react("❌");
                             return Gifted.sendMessage(from, { text: "❌ First stage link generation failed." }, { quoted: ck });
                         }
 
                         const { data: sadasData } = await axios.get(`https://apis.sadas.dev/api/v1/movie/cinesubz/dl?q=${encodeURIComponent(dlData.data.download_url)}&apiKey=ea4d57a2a2db72e0bb3ba58f56b1ff9b`);
-                        if (!sadasData.status || !sadasData.data?.links) {
+                        if (!sadasData || !sadasData.status || !sadasData.data?.links) {
                             await react("❌");
                             return Gifted.sendMessage(from, { text: "❌ Direct download link generation failed." }, { quoted: ck });
                         }
@@ -328,7 +366,7 @@ gmd(
                             mimetype: "video/mp4",
                             fileName: `${sadasData.data.title || epSession.title}.mp4`,
                             jpegThumbnail: thumb,
-                            caption: `🎬 *${epSession.seriesTitle}*\n📌 *${epSession.title}*\n\n🎞️ \`Quality:\` *${finalQuality.quality}*\n📦 \`Size:\` *${finalQuality.size}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀන්*`
+                            caption: `🎬 *${epSession.seriesTitle}*\n📌 *${epSession.title}*\n\n🎞️ \`Quality:\` *${finalQuality.quality || "N/A"}*\n📦 \`Size:\` *${finalQuality.size || "N/A"}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
                         }, { quoted: ck });
                         await react("✅");
                     }
