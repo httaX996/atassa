@@ -122,8 +122,8 @@ gmd(
                             buttons: [{
                                 name: "quick_reply",
                                 buttonParamsJson: JSON.stringify({
-                                    display_text: "📥 DOWNLOAD",
-                                    id: `tv_seasons_${sessionId}_${index}`
+                                    display_text: "📥 DOWNLOAD", // බටන් එකේ text එක "DOWNLOAD" ලෙස හැදුවා
+                                    id: `tv_seasons_${sessionId}_${index}` // ID එක බටන් ලිස්නර් එකට ගැලපෙන්න හැදුවා
                                 }),
                             }],
                         },
@@ -139,7 +139,7 @@ gmd(
                             messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
                             interactiveMessage: {
                                 body: { text: `🔍 𝗖𝗞 𝗖𝗜𝗡𝗘𝗦𝗨𝗕𝗭 𝗧𝗩 𝗦𝗘𝗔𝗥𝗖𝗛 \n\nResults for: *${q}*` },
-                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*` },
+                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍිනා ᴋᴀᴠɪꜱʜᴀන්*` },
                                 carouselMessage: { cards },
                             },
                         },
@@ -165,7 +165,7 @@ gmd(
                     const currentJid = msg.key.remoteJid;
                     if (currentJid !== from) return;
 
-                    // A. SELECT SEASONS ක්ලික් කරපු ගමන් මුලින්ම Details සහ ඊට පස්සේ Episode List එක
+                    // A. DOWNLOAD (SELECT SEASONS) ක්ලික් කරපු ගමන් මුලින්ම Details සහ ඊට පස්සේ Episode List එක
                     if (selectedButtonId.startsWith(`tv_seasons_${sessionId}_`)) {
                         const movieIndex = parseInt(selectedButtonId.replace(`tv_seasons_${sessionId}_`, ""));
                         const session = tvSearchSessions.get(sessionId);
@@ -189,18 +189,27 @@ gmd(
                         session.seasonKeys = Object.keys(movieData.seasons);
                         tvSearchSessions.set(sessionId, session);
 
-                        // Details Caption එක සකස් කිරීම
-                        let detailsCaption = `🎬 \`${movieData.title}\`\n\n`;
+                        // Data හිස් වුණොත් crash වීම වැළැක්වීමට safe check එකක් දමා ඇත
+                        let detailsCaption = `🎬 *${movieData.title || "N/A"}*\n\n`;
                         detailsCaption += `📅 \`YEAR:\` *${movieData.year || "N/A"}*\n`;
                         detailsCaption += `⭐ \`IMDB:\` *${movieData.imdb || "N/A"}*\n`;
                         detailsCaption += `🌍 \`COUNTRY:\` *${movieData.country || "N/A"}*\n`;
-                        detailsCaption += `🎭 \`CAST:\` ${movieData.cast?.slice(1, 5).map(c => `*• ${c}*`).join('\n') || "N/A"}\n\n`;
-                        detailsCaption += `📝 \`DESC:\` _${movieData.description?.slice(0, 200)}..._\n\n`;
-                        detailsCaption += `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`;
+                        
+                        if (movieData.cast && Array.isArray(movieData.cast)) {
+                            detailsCaption += `🎭 \`CAST:\` ${movieData.cast.slice(0, 4).map(c => `*• ${c}*`).join('\n')}\n\n`;
+                        } else {
+                            detailsCaption += `🎭 \`CAST:\` N/A\n\n`;
+                        }
+                        
+                        if (movieData.description) {
+                            detailsCaption += `📝 \`DESC:\` _${movieData.description.slice(0, 200)}..._\n\n`;
+                        }
+                        
+                        detailsCaption += `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀන්*`;
 
                         // 1. මුලින්ම Poster එක සහ Details යවනවා
                         await Gifted.sendMessage(from, {
-                            image: { url: movieData.poster || session.moviesSlice[movieIndex].image },
+                            image: { url: movieData.poster || session.moviesSlice[movieIndex].image || config.IMG_URL },
                             caption: detailsCaption
                         }, { quoted: ck });
 
@@ -319,7 +328,7 @@ gmd(
                             mimetype: "video/mp4",
                             fileName: `${sadasData.data.title || epSession.title}.mp4`,
                             jpegThumbnail: thumb,
-                            caption: `🎬 *${epSession.seriesTitle}*\n📌 *${epSession.title}*\n\n🎞️ \`Quality:\` *${finalQuality.quality}*\n📦 \`Size:\` *${finalQuality.size}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+                            caption: `🎬 *${epSession.seriesTitle}*\n📌 *${epSession.title}*\n\n🎞️ \`Quality:\` *${finalQuality.quality}*\n📦 \`Size:\` *${finalQuality.size}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀන්*`
                         }, { quoted: ck });
                         await react("✅");
                     }
