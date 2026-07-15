@@ -165,7 +165,7 @@ gmd(
                     const currentJid = msg.key.remoteJid;
                     if (currentJid !== from) return;
 
-                    // A. DOWNLOAD බටන් එක ක්ලික් කළ විට
+                    // A. DOWNLOAD බටන් එක ක්ලික් කළ විට (Details + Episode Selector)
                     if (selectedButtonId.startsWith(`tv_seasons_${sessionId}_`)) {
                         const movieIndex = parseInt(selectedButtonId.replace(`tv_seasons_${sessionId}_`, ""));
                         const session = tvSearchSessions.get(sessionId);
@@ -179,19 +179,15 @@ gmd(
                         const infoUrl = `https://chethmina-kavishan-cinesubz-api-v1.vercel.app/api/tvinfo?url=${encodeURIComponent(session.moviesSlice[movieIndex].link)}`;
                         const { data } = await axios.get(infoUrl);
 
-                        // Debugging සදහා: API Response එක console එකට ගන්නවා.
-                        console.log("CINETV INFO API RESPONSE:", JSON.stringify(data, null, 2));
-
                         if (!data || (!data.success && !data.data)) {
                             await react("❌");
-                            return Gifted.sendMessage(from, { text: "❌ Failed to fetch details from server." }, { quoted: ck });
+                            return Gifted.sendMessage(from, { text: "❌ Failed to fetch details." }, { quoted: ck });
                         }
 
-                        // API Response එකේ data තියෙන තැන හරියට ගමු (data.data හෝ කෙලින්ම data)
+                        // API Response එකේ data field එකට value එක ගන්නවා
                         const movieData = data.data || data;
                         session.tvInfo = movieData;
                         
-                        // සේසන්ස් ලිස්ට් එකක් තියෙනවද කියලා බලනවා
                         const seasonsObj = movieData.seasons || {};
                         session.seasonKeys = Object.keys(seasonsObj);
                         tvSearchSessions.set(sessionId, session);
@@ -201,23 +197,36 @@ gmd(
                             return Gifted.sendMessage(from, { text: "❌ No seasons found for this TV series." }, { quoted: ck });
                         }
 
-                        // Safe Values assign කිරීම (API එකෙන් missing data ආවොත් crash වීම වැලැක්වීමට)
+                        // 🔴 Crash වීම් වළක්වන Safe Variable Mapping
                         const tvTitle = movieData.title || session.moviesSlice[movieIndex].title || "Unknown Title";
                         const tvYear = movieData.year || "N/A";
                         const tvImdb = movieData.imdb || "N/A";
                         const tvCountry = movieData.country || "N/A";
                         const tvPoster = movieData.poster || movieData.image || session.moviesSlice[movieIndex].image || config.IMG_URL;
                         
+                        // Cast එක array එකක්ද බලා "Cast Collection" කියන මුල් කෑල්ල අතහැර ලස්සනට සකසයි
                         let tvCast = "N/A";
-                        if (movieData.cast && Array.isArray(movieData.cast)) {
-                            tvCast = movieData.cast.slice(0, 4).map(c => `*• ${c}*`).join('\n');
-                        } else if (typeof movieData.cast === 'string') {
-                            tvCast = movieData.cast;
+                        try {
+                            if (movieData.cast && Array.isArray(movieData.cast)) {
+                                // "Cast Collection" කියන එක අතහැර ඉතුරු cast සාමාජිකයන් 4 දෙනෙක් පෙන්නයි
+                                const filteredCast = movieData.cast.filter(c => c !== "Cast Collection");
+                                if (filteredCast.length > 0) {
+                                    tvCast = filteredCast.slice(0, 4).map(c => `*• ${c}*`).join('\n');
+                                }
+                            } else if (typeof movieData.cast === 'string') {
+                                tvCast = movieData.cast;
+                            }
+                        } catch (e) {
+                            tvCast = "N/A";
                         }
 
                         let tvDesc = "No description available.";
-                        if (movieData.description) {
-                            tvDesc = movieData.description.length > 200 ? movieData.description.slice(0, 200) + "..." : movieData.description;
+                        try {
+                            if (movieData.description) {
+                                tvDesc = movieData.description.length > 200 ? movieData.description.slice(0, 200) + "..." : movieData.description;
+                            }
+                        } catch (e) {
+                            tvDesc = "No description available.";
                         }
 
                         // Details Caption එක සකස් කිරීම
@@ -229,15 +238,15 @@ gmd(
                         detailsCaption += `📝 \`DESC:\` _${tvDesc}_\n\n`;
                         detailsCaption += `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`;
 
-                        // 1. මුලින්ම Poster එක සහ Details යවනවා (Error Safe)
+                        // 1. මුලින්ම Poster එක සහ Details යවනවා
                         try {
                             await Gifted.sendMessage(from, {
                                 image: { url: tvPoster },
                                 caption: detailsCaption
                             }, { quoted: ck });
                         } catch (imgErr) {
-                            console.error("Poster sending failed, falling back to text only:", imgErr);
-                            // Poster එක යවන්න බැරි වුනොත් (Invalid URL) Text එක විතරක් යවනවා
+                            console.error("Poster Send Error:", imgErr);
+                            // Poster එක යැවීම අසාර්ථක වුවහොත් Text එක පමණක් යවයි
                             await Gifted.sendMessage(from, { text: detailsCaption }, { quoted: ck });
                         }
 
