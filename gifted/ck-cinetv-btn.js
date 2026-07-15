@@ -133,7 +133,7 @@ gmd(
                             buttons: [{
                                 name: "quick_reply",
                                 buttonParamsJson: JSON.stringify({
-                                    display_text: "📥 SELECT SEASONS",
+                                    display_text: "📥 DOWNLOAD",
                                     id: `tv_seasons_${sessionId}_${index}`
                                 }),
                             }],
@@ -150,7 +150,7 @@ gmd(
                             messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
                             interactiveMessage: {
                                 body: { text: `🔍 𝗖𝗞 𝗖𝗜𝗡𝗘𝗦𝗨𝗕𝗭 𝗧𝗩 𝗦𝗘𝗔𝗥𝗖𝗛 \n\nResults for: *${q}*` },
-                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀන්*` },
+                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*` },
                                 carouselMessage: { cards },
                             },
                         },
@@ -227,7 +227,7 @@ gmd(
                         detailsCaption += `🌍 \`COUNTRY:\` *${tvCountry}*\n`;
                         detailsCaption += `🎭 \`CAST:\` \n${tvCast}\n\n`;
                         detailsCaption += `📝 \`DESC:\` _${tvDesc}_\n\n`;
-                        detailsCaption += `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀන්*`;
+                        detailsCaption += `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`;
 
                         // 1. මුලින්ම Poster එක සහ Details යවනවා (Buffer ක්‍රමයට)
                         try {
@@ -364,7 +364,7 @@ gmd(
                             mimetype: "video/mp4",
                             fileName: `${sadasData.data.title || epSession.title}.mp4`,
                             jpegThumbnail: thumb,
-                            caption: `🎬 *${epSession.seriesTitle}*\n📌 *${epSession.title}*\n\n🎞️ \`Quality:\` *${finalQuality.quality}*\n📦 \`Size:\` *${finalQuality.size}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀන්*`
+                            caption: `🎬 *${epSession.seriesTitle}*\n📌 *${epSession.title}*\n\n🎞️ \`Quality:\` *${finalQuality.quality}*\n📦 \`Size:\` *${finalQuality.size}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
                         }, { quoted: ck });
                         await react("✅");
                     }
