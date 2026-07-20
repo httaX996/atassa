@@ -19,9 +19,41 @@ const ck = {
     }
 };
 
+/* ================= MIME TYPE AUTO DETECT ================= */
+
+function getMimeType(fileName, fallback) {
+    if (!fileName) return fallback || "application/octet-stream";
+    const ext = fileName.split('.').pop().toLowerCase();
+
+    const map = {
+        mp4: "video/mp4",
+        mkv: "video/x-matroska",
+        avi: "video/x-msvideo",
+        mov: "video/quicktime",
+        webm: "video/webm",
+
+        mp3: "audio/mpeg",
+        m4a: "audio/mp4",
+        wav: "audio/wav",
+
+        pdf: "application/pdf",
+        zip: "application/zip",
+        rar: "application/x-rar-compressed",
+        "7z": "application/x-7z-compressed",
+
+        apk: "application/vnd.android.package-archive",
+
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        png: "image/png",
+        webp: "image/webp"
+    };
+
+    return map[ext] || fallback || "application/octet-stream";
+}
+
 /* ================= HELPER FUNCTIONS ================= */
 
-// Interactive Message වලින් Button ID extract කරගැනීම
 function extractButtonId(msg) {
     if (!msg) return null;
     if (msg.templateButtonReplyMessage?.selectedId) return msg.templateButtonReplyMessage.selectedId;
@@ -37,32 +69,22 @@ function extractButtonId(msg) {
     return null;
 }
 
-// Thumbnail නිර්මාණය කිරීම
 async function createThumbnail(imageUrl) {
     try {
         const res = await axios.get(imageUrl, { responseType: "arraybuffer", timeout: 5000 });
         return await sharp(res.data)
-            .resize(300, 300)
-            .jpeg({ quality: 80 })
+            .resize(150, 150)
+            .jpeg({ quality: 60 })
             .toBuffer();
     } catch (e) {
         return null;
     }
 }
 
-// Mime Type සොයා ගැනීම
-function getMimeType(fileName, fallback) {
-    if (!fileName) return fallback || "video/mp4";
-    const ext = fileName.split('.').pop().toLowerCase();
-    const map = {
-        mp4: "video/mp4", mkv: "video/x-matroska", avi: "video/x-msvideo",
-        webm: "video/webm", mp3: "audio/mpeg", pdf: "application/pdf"
-    };
-    return map[ext] || fallback || "video/mp4";
-}
+/* ================= GDRIVE SCRAPER (from ck-g.js) ================= */
 
-// Google Drive Downloader (ckg logic)
 async function fetchGDrive(url) {
+    // 1. Try api-dylux methods safely
     try {
         if (typeof fg.gdrive === 'function') {
             const res = await fg.gdrive(url);
@@ -72,18 +94,26 @@ async function fetchGDrive(url) {
             const res = await fg.GDriveDl(url);
             if (res && res.downloadUrl) return res;
         }
-    } catch (e) {}
+    } catch (e) {
+        console.log("api-dylux error, trying direct API...");
+    }
 
+    // 2. Direct External API Fallback
     try {
         const apiRes = await axios.get(`https://api.vreden.my.id/api/gdrive?url=${encodeURIComponent(url)}`);
         if (apiRes.data && apiRes.data.result) {
             const data = apiRes.data.result;
             return {
-                fileName: data.fileName || data.title || "video.mp4",
+                fileName: data.fileName || data.title || "gdrive_file",
+                fileSize: data.fileSize || data.size || "Unknown",
+                mimetype: data.mimetype || "application/octet-stream",
                 downloadUrl: data.downloadUrl || data.url
             };
         }
-    } catch (err) {}
+    } catch (err) {
+        console.log("Direct API error:", err.message);
+    }
+
     return null;
 }
 
@@ -109,7 +139,7 @@ gmd(
 
             const dateNow = Date.now();
 
-            // 1. Search API එකෙන් Data ලබාගැනීම
+            // 1. Search API
             const searchUrl = `https://ck-pahe-inc-api-123xyz.vercel.app/api/search?q=${encodeURIComponent(q)}`;
             const searchRes = await axios.get(searchUrl);
 
@@ -118,9 +148,9 @@ gmd(
                 return reply("❌ *කිසිදු ප්‍රතිඵලයක් හමු වූයේ නැත.*");
             }
 
-            const results = searchRes.data.results.slice(0, 15);
+            const results = searchRes.data.results.slice(0, 100);
 
-            // 2. Select List Buttons සැකසීම
+            // 2. Interactive Select List Buttons
             const buttonRows = results.map((item, index) => ({
                 header: `🎬 Result ${index + 1}`,
                 title: item.title.slice(0, 50),
@@ -138,7 +168,6 @@ gmd(
                 ]
             };
 
-            // Interactive List Message යැවීම
             await sendInteractiveMessage(Gifted, from, {
                 text: `🔥 *GINISISILA MOVIE SEARCH* 🔥\n\n🔎 Results found for: *${q}*\n👇 කරුණාකර පහත ලැයිස්තුවෙන් ඔබට අවශ්‍ය එක තෝරන්න:`,
                 footer: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`,
@@ -152,7 +181,7 @@ gmd(
 
             await react("✅");
 
-            // 3. Selection Event Listener (Multiple selection support)
+            // 3. Selection Event Listener (Expire නොවී වැඩ කරන ලෙස)
             const selectionListener = async (update) => {
                 try {
                     const msg = update.messages[0];
@@ -168,7 +197,7 @@ gmd(
 
                     await react("⏳");
 
-                    // Movie Info API Fetch කිරීම
+                    // Fetch Movie Info API
                     const infoUrl = `https://ck-pahe-inc-api-123xyz.vercel.app/api/info?url=${encodeURIComponent(selectedMovie.link)}`;
                     const infoRes = await axios.get(infoUrl);
 
@@ -179,13 +208,13 @@ gmd(
 
                     const info = infoRes.data.result;
 
-                    // Title & Image Message යැවීම
+                    // Send Title & Image Message
                     await Gifted.sendMessage(from, {
                         image: { url: info.image_link || selectedMovie.image_link },
                         caption: `🎬 *${info.title}*\n\n> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
                     }, { quoted: ck });
 
-                    // Download start message යැවීම
+                    // Send Download Start Message
                     await Gifted.sendMessage(from, { text: "📥 *Your downloading start...*" }, { quoted: ck });
 
                     // Fetch DL Link API
@@ -200,15 +229,15 @@ gmd(
                     const streamLink = dlRes.data.stream_link;
                     const mainThumb = await createThumbnail(info.image_link || selectedMovie.image_link);
 
-                    /* ================= STREAM LINK HANDLERS ================= */
+                    /* ================= DOMAIN HANDLERS ================= */
 
-                    // 1. RUMBLE DOMAIN HANDLER
+                    // 1. RUMBLE HANDLER
                     if (streamLink.includes("rumble.com")) {
                         await react("⬇️");
                         const rumRes = await axios.get(`https://ck-pahe-inc-api-123xyz.vercel.app/api/rumdl?url=${encodeURIComponent(streamLink)}`);
 
                         if (rumRes.data?.status && rumRes.data?.downloads?.length > 0) {
-                            const videoUrl = rumRes.data.downloads[0].url; // පළමු Quality URL එක
+                            const videoUrl = rumRes.data.downloads[0].url;
 
                             await react("⬆️");
                             await Gifted.sendMessage(from, {
@@ -216,7 +245,7 @@ gmd(
                                 mimetype: "video/mp4",
                                 fileName: `${rumRes.data.title || info.title}.mp4`,
                                 jpegThumbnail: mainThumb,
-                                caption: `🎬 *${rumRes.data.title || info.title}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+                                caption: `🎬 *${rumRes.data.title || info.title}*\n\n> ⚡ *Powered by Ginisisila Downloader*`
                             }, { quoted: ck });
                             await react("✅");
                         } else {
@@ -225,28 +254,53 @@ gmd(
                         }
                     }
 
-                    // 2. GOOGLE DRIVE DOMAIN HANDLER
+                    // 2. GOOGLE DRIVE HANDLER (ck-g.js system එකම එකතු කර ඇත)
                     else if (streamLink.includes("drive.google.com") || streamLink.includes("docs.google.com")) {
-                        await react("⬇️");
-                        const gdData = await fetchGDrive(streamLink);
+                        await react("📥");
 
-                        if (gdData && gdData.downloadUrl) {
-                            await react("⬆️");
-                            await Gifted.sendMessage(from, {
-                                document: { url: gdData.downloadUrl },
-                                mimetype: getMimeType(gdData.fileName, "video/mp4"),
-                                fileName: `${gdData.fileName || info.title}.mp4`,
-                                jpegThumbnail: mainThumb,
-                                caption: `🎬 *${info.title}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
-                            }, { quoted: ck });
-                            await react("✅");
-                        } else {
+                        // Fetch GDrive Data
+                        const gdriveData = await fetchGDrive(streamLink.trim());
+
+                        if (!gdriveData || !gdriveData.downloadUrl) {
                             await react("❌");
-                            reply("❌ *Google Drive ෆයිල් එක ලබා ගැනීමට අපොහොසත් විය.*", msg);
+                            return reply("*Error..! Your URL is Private, Invalid, or File is too large.*", msg);
                         }
+
+                        // Auto mimetype detect
+                        const mime = getMimeType(
+                            gdriveData.fileName,
+                            gdriveData.mimetype
+                        );
+
+                        // GDrive Info Message (from ck-g.js)
+                        await Gifted.sendMessage(from, {
+                            text: `🎬 \`CK CineMAX DOWNLOADER\` 🎬\n\n` +
+                                  `📃 \`File name:\` *${gdriveData.fileName}*\n` +
+                                  `💈 \`File Size:\` *${gdriveData.fileSize || "Unknown"}*\n` +
+                                  `🕹️ \`File type:\` *${mime}*\n\n` +
+                                  `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+                        }, { quoted: ck });
+
+                        await react("⬆️");
+
+                        // Build Document Payload
+                        const docPayload = {
+                            document: { url: gdriveData.downloadUrl },
+                            fileName: `🎬 CK CineMAX 🎬 ${gdriveData.fileName}`,
+                            mimetype: mime,
+                            caption: `🍿 \`${gdriveData.fileName} - සිංහල උපසිරැසි සමඟ\`\n\n> ⚡ ᴘᴏᴡᴇʀᴇᴅ ʙʏ *CK CineMAX*`
+                        };
+
+                        if (mainThumb) {
+                            docPayload.jpegThumbnail = mainThumb;
+                        }
+
+                        // Send file as Document
+                        await Gifted.sendMessage(from, docPayload, { quoted: ck });
+                        await react("✅");
                     }
 
-                    // 3. YOUTUBE DOMAIN HANDLER
+                    // 3. YOUTUBE HANDLER
                     else if (streamLink.includes("youtube.com") || streamLink.includes("youtu.be")) {
                         await react("⬇️");
                         const ytApiUrl = `https://suhasbro-ytdl-api.vercel.app/api/ytmp4?url=${encodeURIComponent(streamLink)}&quality=720&apikey=SuhasBroYTDL-api`;
@@ -259,7 +313,7 @@ gmd(
                                 mimetype: "video/mp4",
                                 fileName: `${ytRes.data.metadata?.title || info.title}.mp4`,
                                 jpegThumbnail: mainThumb,
-                                caption: `🎬 *${ytRes.data.metadata?.title || info.title}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+                                caption: `🎬 *${ytRes.data.metadata?.title || info.title}*\n\n> ⚡ *Powered by Ginisisila Downloader*`
                             }, { quoted: ck });
                             await react("✅");
                         } else {
@@ -271,7 +325,7 @@ gmd(
                     // 4. UNSUPPORTED DOMAINS
                     else {
                         await react("❌");
-                        return reply("⚠️ *මෙම site එක තාම downloader එකට add කරලා නෑ.*", msg);
+                        return reply("⚠️ *මේ site එක තාම downloader එකට add කරලා නෑ*", msg);
                     }
 
                 } catch (err) {
@@ -283,7 +337,7 @@ gmd(
             // Listener Register කිරීම
             Gifted.ev.on("messages.upsert", selectionListener);
 
-            // විනාඩි 15කින් Listener එක Expire කර දැමීම (15 * 60 * 1000 ms)
+            // විනාඩි 15කින් Listener එක Expire කිරීම
             setTimeout(() => {
                 Gifted.ev.off("messages.upsert", selectionListener);
             }, 900000);
