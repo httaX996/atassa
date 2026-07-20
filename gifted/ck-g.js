@@ -3,24 +3,10 @@ const fg = require("api-dylux");
 const axios = require("axios");
 const sharp = require("sharp");
 
-// Custom Quoted Context (ck object)
-const ck = {
-    key: {
-        fromMe: false,
-        participant: "0@s.whatsapp.net",
-        remoteJid: "status@broadcast"
-    },
-    message: {
-        contactMessage: {
-            displayName: "〴ᴄʜᴇᴛʜᴍɪɴᴀ ×͜×",
-            vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:Meta\nORG:META AI;\nTEL;type=CELL;type=VOICE;waid=13135550002:+13135550002\nEND:VCARD`
-        }
-    }
-};
-
 /* ================= MIME TYPE AUTO DETECT ================= */
 
 function getMimeType(fileName, fallback) {
+    if (!fileName) return fallback || "application/octet-stream";
     const ext = fileName.split('.').pop().toLowerCase();
 
     const map = {
@@ -52,16 +38,29 @@ function getMimeType(fileName, fallback) {
 
 /* ================= THUMBNAIL FUNCTION ================= */
 
-async function createThumbnail(imageUrl, width = 150, height = 150) {
+async function createThumbnail(imageUrl) {
     try {
-        const res = await axios.get(imageUrl, { responseType: "arraybuffer" });
+        const res = await axios.get(imageUrl, { responseType: "arraybuffer", timeout: 5000 });
         return await sharp(res.data)
-            .resize(width, height)
+            .resize(150, 150)
             .jpeg({ quality: 60 })
             .toBuffer();
     } catch (e) {
-        console.log("Thumbnail Error:", e);
-        return null;
+        return null; // Thumbnail බැරි වුනොත් error නොදී null යවයි
+    }
+}
+
+/* ================= GDRIVE LINK CLEANER ================= */
+
+function cleanGDriveUrl(url) {
+    try {
+        const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) {
+            return `https://drive.google.com/uc?id=${match[1]}&export=download`;
+        }
+        return url;
+    } catch (e) {
+        return url;
     }
 }
 
@@ -75,7 +74,7 @@ gmd(
         description: "Download Google Drive files",
     },
     async (from, Gifted, conText) => {
-        const { q, reply, react } = conText;
+        const { q, reply, react, m } = conText;
 
         try {
             if (!q) {
@@ -85,11 +84,15 @@ gmd(
 
             await react("📥");
 
-            const gdriveData = await fg.GDriveDl(q);
+            // URL එක Clean කරගැනීම
+            const cleanedUrl = cleanGDriveUrl(q.trim());
+
+            // GDrive Dl Fetch
+            const gdriveData = await fg.GDriveDl(cleanedUrl).catch(() => null);
 
             if (!gdriveData || !gdriveData.downloadUrl) {
                 await react("❌");
-                return reply("*Error..! Your URL is Private or Invalid*");
+                return reply("*Error..! Your URL is Private, Invalid, or File is too large.*");
             }
 
             // Auto mimetype detect
@@ -110,25 +113,31 @@ gmd(
                       `💈 \`File Size:\` *${gdriveData.fileSize}*\n` +
                       `🕹️ \`File type:\` *${mime}*\n\n` +
                       `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
-            }, { quoted: ck });
+            }, { quoted: m });
 
             await react("⬆️");
 
-            // Send file as Document
-            await Gifted.sendMessage(from, {
+            // Build Message Payload
+            const docPayload = {
                 document: { url: gdriveData.downloadUrl },
                 fileName: `🎬 CK CineMAX 🎬 ${gdriveData.fileName}`,
                 mimetype: mime,
-                jpegThumbnail: thumb,
-                caption: `🍿 \`${gdriveData.fileName} - සිංහල උපසිරැසි සමඟ\`\n\n> ⚡ ᴘᴏᴡᴇʀᴇᴅ ʙʏ *CK CineMAX*`
-            }, { quoted: ck });
+                caption: `🍿 \`${gdriveData.fileName} - සිංහල උපසිරැසි සමඟ\`\n\n> ⚡ ᴘᴏᴡᴇʀᴇڊ ʙʏ *CK CineMAX*`
+            };
+
+            if (thumb) {
+                docPayload.jpegThumbnail = thumb;
+            }
+
+            // Send file as Document
+            await Gifted.sendMessage(from, docPayload, { quoted: m });
 
             await react("✅");
 
         } catch (err) {
-            console.error(err);
+            console.error("CKG Command Error:", err);
             await react("❌");
-            reply("*Error..! Something went wrong*");
+            reply(`*Error..! ${err.message || "Something went wrong"}*`);
         }
     }
 );
