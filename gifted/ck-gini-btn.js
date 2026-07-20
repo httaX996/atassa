@@ -291,37 +291,64 @@ gmd(
                         await react("✅");
                     }
 
-                    // 3. YOUTUBE HANDLER
-else if (streamLink.includes("youtube.com") || streamLink.includes("youtu.be")) {
-    await react("⬇️");
+                                        // 3. YOUTUBE HANDLER (WITH BACKUP API)
+                    else if (streamLink.includes("youtube.com") || streamLink.includes("youtu.be")) {
+                        await react("⬇️");
 
-    // Embed URL එක Standard YouTube URL එකක් බවට Convert කිරීම
-    let cleanYtUrl = streamLink;
-    if (streamLink.includes("/embed/")) {
-        const videoId = streamLink.split("/embed/")[1]?.split("?")[0];
-        if (videoId) {
-            cleanYtUrl = `https://www.youtube.com/watch?v=${videoId}`;
-        }
-    }
+                        // Embed URL එක Standard URL එකක් කිරීම
+                        let cleanYtUrl = streamLink;
+                        if (streamLink.includes("/embed/")) {
+                            const videoId = streamLink.split("/embed/")[1]?.split("?")[0];
+                            if (videoId) {
+                                cleanYtUrl = `https://www.youtube.com/watch?v=${videoId}`;
+                            }
+                        }
 
-    const ytApiUrl = `https://suhasbro-ytdl-api.vercel.app/api/ytmp4?url=${encodeURIComponent(cleanYtUrl)}&quality=720&apikey=SuhasBroYTDL-api`;
-    const ytRes = await axios.get(ytApiUrl);
+                        let downloadUrl = null;
+                        let videoTitle = info.title;
 
-    if (ytRes.data?.status && ytRes.data?.download?.url) {
-        await react("⬆️");
-        await Gifted.sendMessage(from, {
-            document: { url: ytRes.data.download.url },
-            mimetype: "video/mp4",
-            fileName: `${ytRes.data.metadata?.title || info.title}.mp4`,
-            jpegThumbnail: mainThumb,
-            caption: `🎬 *${ytRes.data.metadata?.title || info.title}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
-        }, { quoted: ck });
-        await react("✅");
-    } else {
-        await react("❌");
-        reply("❌ *YouTube Video එක ලබා ගැනීමට අපොහොසත් විය.*", msg);
-    }
-}
+                        // 1. Primary API (SuhasBro API)
+                        try {
+                            const ytApiUrl = `https://suhasbro-ytdl-api.vercel.app/api/ytmp4?url=${encodeURIComponent(cleanYtUrl)}&quality=720&apikey=SuhasBroYTDL-api`;
+                            const ytRes = await axios.get(ytApiUrl, { timeout: 10000 });
+                            
+                            if (ytRes.data?.status && ytRes.data?.download?.url) {
+                                downloadUrl = ytRes.data.download.url;
+                                if (ytRes.data.metadata?.title) videoTitle = ytRes.data.metadata.title;
+                            }
+                        } catch (e) {
+                            console.log("SuhasBro API Error, trying Backup API...");
+                        }
+
+                        // 2. Backup API (If Primary Fails)
+                        if (!downloadUrl) {
+                            try {
+                                const backupRes = await axios.get(`https://api.vreden.my.id/api/ytmp4?url=${encodeURIComponent(cleanYtUrl)}`, { timeout: 10000 });
+                                if (backupRes.data?.result?.download?.url) {
+                                    downloadUrl = backupRes.data.result.download.url;
+                                    if (backupRes.data.result.title) videoTitle = backupRes.data.result.title;
+                                }
+                            } catch (e) {
+                                console.log("Backup API Error:", e.message);
+                            }
+                        }
+
+                        // Download & Send Video Document
+                        if (downloadUrl) {
+                            await react("⬆️");
+                            await Gifted.sendMessage(from, {
+                                document: { url: downloadUrl },
+                                mimetype: "video/mp4",
+                                fileName: `${videoTitle}.mp4`,
+                                jpegThumbnail: mainThumb,
+                                caption: `🎬 *${videoTitle}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+                            }, { quoted: ck });
+                            await react("✅");
+                        } else {
+                            await react("❌");
+                            reply("❌ *YouTube Video එක ලබා ගැනීමට අපොහොසත් විය. (All APIs Failed)*", msg);
+                        }
+                    }
 
 
                     // 4. UNSUPPORTED DOMAINS
