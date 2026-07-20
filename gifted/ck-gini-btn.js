@@ -22,7 +22,7 @@ const ck = {
 /* ================= MIME TYPE AUTO DETECT ================= */
 
 function getMimeType(fileName, fallback) {
-    if (!fileName) return fallback || "application/octet-stream";
+    if (!fileName) return fallback || "video/mp4";
     const ext = fileName.split('.').pop().toLowerCase();
 
     const map = {
@@ -49,7 +49,7 @@ function getMimeType(fileName, fallback) {
         webp: "image/webp"
     };
 
-    return map[ext] || fallback || "application/octet-stream";
+    return map[ext] || fallback || "video/mp4";
 }
 
 /* ================= HELPER FUNCTIONS ================= */
@@ -245,7 +245,7 @@ gmd(
                                 mimetype: "video/mp4",
                                 fileName: `${rumRes.data.title || info.title}.mp4`,
                                 jpegThumbnail: mainThumb,
-                                caption: `🎬 *${rumRes.data.title || info.title}*\n\n> ⚡ *Powered by Ginisisila Downloader*`
+                                caption: `🎬 *${rumRes.data.title || info.title}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
                             }, { quoted: ck });
                             await react("✅");
                         } else {
@@ -254,16 +254,16 @@ gmd(
                         }
                     }
 
-                    // 2. GOOGLE DRIVE HANDLER (ck-g.js system එකම එකතු කර ඇත)
+                    // 2. GOOGLE DRIVE HANDLER
                     else if (streamLink.includes("drive.google.com") || streamLink.includes("docs.google.com")) {
-                        await react("📥");
+                        await react("⬇️");
 
-                        // Fetch GDrive Data
+                        // Fetch GDrive Direct URL
                         const gdriveData = await fetchGDrive(streamLink.trim());
 
                         if (!gdriveData || !gdriveData.downloadUrl) {
                             await react("❌");
-                            return reply("*Error..! Your URL is Private, Invalid, or File is too large.*", msg);
+                            return reply("❌ *Google Drive ෆයිල් එක ලබා ගැනීමට අපොහොසත් විය.*", msg);
                         }
 
                         // Auto mimetype detect
@@ -272,23 +272,14 @@ gmd(
                             gdriveData.mimetype
                         );
 
-                        // GDrive Info Message (from ck-g.js)
-                        await Gifted.sendMessage(from, {
-                            text: `🎬 \`CK CineMAX DOWNLOADER\` 🎬\n\n` +
-                                  `📃 \`File name:\` *${gdriveData.fileName}*\n` +
-                                  `💈 \`File Size:\` *${gdriveData.fileSize || "Unknown"}*\n` +
-                                  `🕹️ \`File type:\` *${mime}*\n\n` +
-                                  `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
-                        }, { quoted: ck });
-
                         await react("⬆️");
 
                         // Build Document Payload
                         const docPayload = {
                             document: { url: gdriveData.downloadUrl },
-                            fileName: `🎬 CK CineMAX 🎬 ${gdriveData.fileName}`,
+                            fileName: `${gdriveData.fileName || info.title}.mp4`,
                             mimetype: mime,
-                            caption: `🍿 \`${gdriveData.fileName} - සිංහල උපසිරැසි සමඟ\`\n\n> ⚡ ᴘᴏᴡᴇʀᴇᴅ ʙʏ *CK CineMAX*`
+                            caption: `🎬 *${info.title}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
                         };
 
                         if (mainThumb) {
@@ -301,26 +292,37 @@ gmd(
                     }
 
                     // 3. YOUTUBE HANDLER
-                    else if (streamLink.includes("youtube.com") || streamLink.includes("youtu.be")) {
-                        await react("⬇️");
-                        const ytApiUrl = `https://suhasbro-ytdl-api.vercel.app/api/ytmp4?url=${encodeURIComponent(streamLink)}&quality=720&apikey=SuhasBroYTDL-api`;
-                        const ytRes = await axios.get(ytApiUrl);
+else if (streamLink.includes("youtube.com") || streamLink.includes("youtu.be")) {
+    await react("⬇️");
 
-                        if (ytRes.data?.status && ytRes.data?.download?.url) {
-                            await react("⬆️");
-                            await Gifted.sendMessage(from, {
-                                document: { url: ytRes.data.download.url },
-                                mimetype: "video/mp4",
-                                fileName: `${ytRes.data.metadata?.title || info.title}.mp4`,
-                                jpegThumbnail: mainThumb,
-                                caption: `🎬 *${ytRes.data.metadata?.title || info.title}*\n\n> ⚡ *Powered by Ginisisila Downloader*`
-                            }, { quoted: ck });
-                            await react("✅");
-                        } else {
-                            await react("❌");
-                            reply("❌ *YouTube Video එක ලබා ගැනීමට අපොහොසත් විය.*", msg);
-                        }
-                    }
+    // Embed URL එක Standard YouTube URL එකක් බවට Convert කිරීම
+    let cleanYtUrl = streamLink;
+    if (streamLink.includes("/embed/")) {
+        const videoId = streamLink.split("/embed/")[1]?.split("?")[0];
+        if (videoId) {
+            cleanYtUrl = `https://www.youtube.com/watch?v=${videoId}`;
+        }
+    }
+
+    const ytApiUrl = `https://suhasbro-ytdl-api.vercel.app/api/ytmp4?url=${encodeURIComponent(cleanYtUrl)}&quality=720&apikey=SuhasBroYTDL-api`;
+    const ytRes = await axios.get(ytApiUrl);
+
+    if (ytRes.data?.status && ytRes.data?.download?.url) {
+        await react("⬆️");
+        await Gifted.sendMessage(from, {
+            document: { url: ytRes.data.download.url },
+            mimetype: "video/mp4",
+            fileName: `${ytRes.data.metadata?.title || info.title}.mp4`,
+            jpegThumbnail: mainThumb,
+            caption: `🎬 *${ytRes.data.metadata?.title || info.title}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+        }, { quoted: ck });
+        await react("✅");
+    } else {
+        await react("❌");
+        reply("❌ *YouTube Video එක ලබා ගැනීමට අපොහොසත් විය.*", msg);
+    }
+}
+
 
                     // 4. UNSUPPORTED DOMAINS
                     else {
