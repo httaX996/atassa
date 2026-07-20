@@ -46,22 +46,44 @@ async function createThumbnail(imageUrl) {
             .jpeg({ quality: 60 })
             .toBuffer();
     } catch (e) {
-        return null; // Thumbnail බැරි වුනොත් error නොදී null යවයි
+        return null;
     }
 }
 
-/* ================= GDRIVE LINK CLEANER ================= */
+/* ================= GDRIVE SCRAPER FALLBACK ================= */
 
-function cleanGDriveUrl(url) {
+async function fetchGDrive(url) {
+    // 1. Try api-dylux methods safely
     try {
-        const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-        if (match && match[1]) {
-            return `https://drive.google.com/uc?id=${match[1]}&export=download`;
+        if (typeof fg.gdrive === 'function') {
+            const res = await fg.gdrive(url);
+            if (res && res.downloadUrl) return res;
         }
-        return url;
+        if (typeof fg.GDriveDl === 'function') {
+            const res = await fg.GDriveDl(url);
+            if (res && res.downloadUrl) return res;
+        }
     } catch (e) {
-        return url;
+        console.log("api-dylux error, trying direct API...");
     }
+
+    // 2. Direct External API Fallback
+    try {
+        const apiRes = await axios.get(`https://api.vreden.my.id/api/gdrive?url=${encodeURIComponent(url)}`);
+        if (apiRes.data && apiRes.data.result) {
+            const data = apiRes.data.result;
+            return {
+                fileName: data.fileName || data.title || "gdrive_file",
+                fileSize: data.fileSize || data.size || "Unknown",
+                mimetype: data.mimetype || "application/octet-stream",
+                downloadUrl: data.downloadUrl || data.url
+            };
+        }
+    } catch (err) {
+        console.log("Direct API error:", err.message);
+    }
+
+    return null;
 }
 
 /* ================= GIFTED COMMAND ================= */
@@ -84,11 +106,8 @@ gmd(
 
             await react("📥");
 
-            // URL එක Clean කරගැනීම
-            const cleanedUrl = cleanGDriveUrl(q.trim());
-
-            // GDrive Dl Fetch
-            const gdriveData = await fg.GDriveDl(cleanedUrl).catch(() => null);
+            // Fetch GDrive Data
+            const gdriveData = await fetchGDrive(q.trim());
 
             if (!gdriveData || !gdriveData.downloadUrl) {
                 await react("❌");
@@ -122,7 +141,7 @@ gmd(
                 document: { url: gdriveData.downloadUrl },
                 fileName: `🎬 CK CineMAX 🎬 ${gdriveData.fileName}`,
                 mimetype: mime,
-                caption: `🍿 \`${gdriveData.fileName} - සිංහල උපසිරැසි සමඟ\`\n\n> ⚡ ᴘᴏᴡᴇʀᴇڊ ʙʏ *CK CineMAX*`
+                caption: `🍿 \`${gdriveData.fileName} - සිංහල උපසිරැසි සමඟ\`\n\n> ⚡ ᴘᴏᴡᴇʀᴇᴅ ʙʏ *CK CineMAX*`
             };
 
             if (thumb) {
@@ -141,4 +160,3 @@ gmd(
         }
     }
 );
-
