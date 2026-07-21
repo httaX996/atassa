@@ -2,10 +2,6 @@ const { gmd } = require("../gift");
 const axios = require('axios');
 const sharp = require('sharp');
 const config = require('../config');
-const {
-    generateWAMessageContent,
-    generateWAMessageFromContent,
-} = require("gifted-baileys");
 const { sendInteractiveMessage } = require("gifted-btns");
 
 // Custom Quoted Context (ck object)
@@ -40,6 +36,7 @@ function extractButtonId(msg) {
 
 async function createThumbnail(url) {
     try {
+        if (!url) return null;
         const response = await axios.get(url, { responseType: 'arraybuffer' });
         return await sharp(response.data)
             .resize(300, 300)
@@ -56,13 +53,12 @@ gmd(
         pattern: "cartoon",
         category: "download",
         aliases: ["cartoons"],
-        description: "Search cartoons with Carousel and Buttons",
+        description: "Search cartoons with Buttons",
     },
     async (from, Gifted, conText) => {
         const { q, reply, react, botFooter } = conText;
 
-        // botFooter එක undefined වෙන එක වැළැක්වීමට safe string එකක් තැබීම
-        const safeFooter = botFooter || "👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ";
+        const safeFooter = (botFooter && typeof botFooter === 'string') ? botFooter : "👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ";
 
         try {
             if (!q) {
@@ -84,70 +80,49 @@ gmd(
             }
 
             const cartoonsSlice = searchData.results.slice(0, 10);
-            const cards = await Promise.all(
-                cartoonsSlice.map(async (cartoon, index) => {
-                    const imageUrl = cartoon.image || cartoon.poster || config.IMG_URL;
-                    const mediaContent = await generateWAMessageContent(
-                        { image: { url: imageUrl } },
-                        { upload: Gifted.waUploadToServer }
-                    );
 
-                    return {
-                        header: {
-                            title: `🧸 *${cartoon.title || "Cartoon"}*`,
-                            hasMediaAttachment: true,
-                            imageMessage: mediaContent.imageMessage,
-                        },
-                        body: {
-                            text: `✨ Click the button below to fetch available options.`,
-                        },
-                        footer: { text: `> ${safeFooter}` },
-                        nativeFlowMessage: {
-                            buttons: [
-                                {
-                                    name: "quick_reply",
-                                    buttonParamsJson: JSON.stringify({
-                                        display_text: "📥 FETCH CARTOON",
-                                        id: `cartoon_dl_${index}_${dateNow}`
-                                    }),
-                                }
-                            ],
-                        },
-                    };
-                })
-            );
+            // 2. Build Interactive Select Menu for Search Results
+            const searchRows = cartoonsSlice.map((cartoon, index) => ({
+                header: `Result ${index + 1}`,
+                title: cartoon.title || "Cartoon",
+                description: `Click to select this cartoon`,
+                id: `cartoon_select_${index}_${dateNow}`
+            }));
 
-            const carouselMessage = generateWAMessageFromContent(
-                from,
-                {
-                    viewOnceMessage: {
-                        message: {
-                            messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
-                            interactiveMessage: {
-                                body: { text: `🔍 𝗖𝗞 𝗖𝗔𝗥𝗧𝗢𝗢𝗡 𝗦𝗘𝗔𝗥𝗖𝗛 \n\nResults for: *${q}*` },
-                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*` },
-                                carouselMessage: { cards },
-                            },
-                        },
-                    },
-                },
-                { quoted: ck }
-            );
+            const searchButtonParams = {
+                title: '🧸 Select a Cartoon',
+                sections: [
+                    {
+                        title: `Search Results for: ${q}`,
+                        rows: searchRows
+                    }
+                ]
+            };
 
-            await Gifted.relayMessage(from, carouselMessage.message, { messageId: carouselMessage.key.id });
+            await sendInteractiveMessage(Gifted, from, {
+                text: `🔍 *𝗖𝗞 𝗖𝗔𝗥𝗧𝗢𝗢𝗡 𝗦𝗘𝗔𝗥𝗖𝗛*\n\nResults found for: *${q}*\nSelect a cartoon from the list below:`,
+                footer: safeFooter,
+                interactiveButtons: [
+                    {
+                        name: 'single_select',
+                        buttonParamsJson: JSON.stringify(searchButtonParams)
+                    }
+                ]
+            }, { quoted: ck });
+
             await react("✅");
 
             // Session tracking Map
             const activeCartoonSessions = new Map();
 
-            // 2. Cartoon Selection Listener
+            // 3. Cartoon Selection Listener
             const cartoonSelectionListener = async (update) => {
                 try {
                     const msg = update.messages[0];
                     if (!msg || !msg.message) return;
 
                     const selectedButtonId = extractButtonId(msg.message);
-                    if (!selectedButtonId || !selectedButtonId.includes(`_${dateNow}`) || !selectedButtonId.startsWith("cartoon_dl_")) return;
+                    if (!selectedButtonId || !selectedButtonId.includes(`_${dateNow}`) || !selectedButtonId.startsWith("cartoon_select_")) return;
                     if (msg.key?.remoteJid !== from) return;
 
                     const cartoonIndex = parseInt(selectedButtonId.split("_")[2]);
@@ -174,10 +149,16 @@ gmd(
                     caption += `💿 \`QUALITY:\` *${cartoonInfo.quality || "N/A"}*\n\n`;
                     caption += `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`;
 
-                    await Gifted.sendMessage(from, {
-                        image: { url: cartoonInfo.image || selectedCartoon.image || config.IMG_URL },
-                        caption: caption
-                    }, { quoted: ck });
+                    const imgUrl = cartoonInfo.image || selectedCartoon.image || config.IMG_URL;
+
+                    if (imgUrl) {
+                        await Gifted.sendMessage(from, {
+                            image: { url: imgUrl },
+                            caption: caption
+                        }, { quoted: ck });
+                    } else {
+                        await Gifted.sendMessage(from, { text: caption }, { quoted: ck });
+                    }
 
                     // Download Links Fetch
                     let cartoonLink = selectedCartoon.url;
@@ -200,20 +181,20 @@ gmd(
                     const directLinks = dlData.direct_links;
                     const dlDateNow = Date.now();
 
-                    // Interactive List Rows
-                    const buttonRows = directLinks.map((linkObj, i) => ({
+                    // Interactive List Rows for Episodes / Links
+                    const linkRows = directLinks.map((linkObj, i) => ({
                         header: `Option ${i + 1}`,
-                        title: `${linkObj.name || "Download Link"}`,
+                        title: (linkObj.name || `Link ${i + 1}`).substring(0, 24),
                         description: `Click to download file`,
                         id: `cartoon_link_${cartoonIndex}_${i}_${dlDateNow}`
                     }));
 
-                    const buttonParams = {
+                    const linkButtonParams = {
                         title: '🟢 Select Cartoon / Episode',
                         sections: [
                             {
                                 title: '📥 Available Download Links',
-                                rows: buttonRows
+                                rows: linkRows
                             }
                         ]
                     };
@@ -226,7 +207,7 @@ gmd(
                         interactiveButtons: [
                             {
                                 name: 'single_select',
-                                buttonParamsJson: JSON.stringify(buttonParams)
+                                buttonParamsJson: JSON.stringify(linkButtonParams)
                             }
                         ]
                     }, { quoted: ck });
@@ -239,7 +220,7 @@ gmd(
                 }
             };
 
-            // 3. Link Selection Listener
+            // 4. Link Selection Listener
             const linkSelectionListener = async (update2) => {
                 try {
                     const msg2 = update2.messages[0];
@@ -266,17 +247,22 @@ gmd(
 
                     await react("⬇️");
 
-                    const thumb = session.cartoonInfo.image ? await createThumbnail(session.cartoonInfo.image) : null;
+                    const thumb = session.cartoonInfo?.image ? await createThumbnail(session.cartoonInfo.image) : null;
 
                     await react("⬆️");
 
-                    await Gifted.sendMessage(from, {
+                    const docOptions = {
                         document: { url: finalDownloadUrl },
                         mimetype: "video/mp4",
                         fileName: `${finalSelectedLink.name || session.cartoonInfo.title || "Cartoon"}.mp4`,
-                        jpegThumbnail: thumb,
                         caption: `🎬 \`${finalSelectedLink.name || session.cartoonInfo.title}\`\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
-                    }, { quoted: ck });
+                    };
+
+                    if (thumb) {
+                        docOptions.jpegThumbnail = thumb;
+                    }
+
+                    await Gifted.sendMessage(from, docOptions, { quoted: ck });
 
                     await react("✅");
 
