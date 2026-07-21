@@ -61,6 +61,9 @@ gmd(
     async (from, Gifted, conText) => {
         const { q, reply, react, botFooter } = conText;
 
+        // botFooter එක undefined වෙන එක වැළැක්වීමට safe string එකක් තැබීම
+        const safeFooter = botFooter || "👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ";
+
         try {
             if (!q) {
                 await react("❌");
@@ -75,29 +78,30 @@ gmd(
             const searchUrl = `https://ck-api-v1.vercel.app/movie/cartoon/search?q=${encodeURIComponent(q)}`;
             const { data: searchData } = await axios.get(searchUrl);
 
-            if (!searchData.success || !searchData.results || !searchData.results.length) {
+            if (!searchData || !searchData.success || !searchData.results || !searchData.results.length) {
                 await react("❌");
                 return reply("❌ No cartoons found.");
             }
 
-            const cartoonsSlice = searchData.results.slice(0, 20);
+            const cartoonsSlice = searchData.results.slice(0, 10);
             const cards = await Promise.all(
                 cartoonsSlice.map(async (cartoon, index) => {
+                    const imageUrl = cartoon.image || cartoon.poster || config.IMG_URL;
                     const mediaContent = await generateWAMessageContent(
-                        { image: { url: cartoon.image || cartoon.poster || config.IMG_URL } },
+                        { image: { url: imageUrl } },
                         { upload: Gifted.waUploadToServer }
                     );
 
                     return {
                         header: {
-                            title: `🧸 *${cartoon.title}*`,
+                            title: `🧸 *${cartoon.title || "Cartoon"}*`,
                             hasMediaAttachment: true,
                             imageMessage: mediaContent.imageMessage,
                         },
                         body: {
                             text: `✨ Click the button below to fetch available options.`,
                         },
-                        footer: { text: `> ${botFooter}` },
+                        footer: { text: `> ${safeFooter}` },
                         nativeFlowMessage: {
                             buttons: [
                                 {
@@ -133,14 +137,14 @@ gmd(
             await Gifted.relayMessage(from, carouselMessage.message, { messageId: carouselMessage.key.id });
             await react("✅");
 
-            // Global/Session tracking Map
+            // Session tracking Map
             const activeCartoonSessions = new Map();
 
             // 2. Cartoon Selection Listener
             const cartoonSelectionListener = async (update) => {
                 try {
                     const msg = update.messages[0];
-                    if (!msg.message) return;
+                    if (!msg || !msg.message) return;
 
                     const selectedButtonId = extractButtonId(msg.message);
                     if (!selectedButtonId || !selectedButtonId.includes(`_${dateNow}`) || !selectedButtonId.startsWith("cartoon_dl_")) return;
@@ -149,20 +153,22 @@ gmd(
                     const cartoonIndex = parseInt(selectedButtonId.split("_")[2]);
                     const selectedCartoon = cartoonsSlice[cartoonIndex];
 
+                    if (!selectedCartoon) return;
+
                     await react("⏳");
 
                     // Info Fetch
                     const infoUrl = `https://ck-api-v1.vercel.app/movie/cartoon/info?url=${encodeURIComponent(selectedCartoon.url)}`;
                     const { data: infoResponse } = await axios.get(infoUrl);
 
-                    const cartoonInfo = infoResponse.results || infoResponse.data || infoResponse;
+                    const cartoonInfo = infoResponse?.results || infoResponse?.data || infoResponse;
 
                     if (!cartoonInfo) {
                         await react("❌");
                         return reply("❌ Failed to fetch cartoon details.", msg);
                     }
 
-                    let caption = `🎬 \`${cartoonInfo.title || selectedCartoon.title}\`\n\n`;
+                    let caption = `🎬 \`${cartoonInfo.title || selectedCartoon.title || "Cartoon"}\`\n\n`;
                     caption += `📅 \`YEAR:\` *${cartoonInfo.year || "N/A"}*\n`;
                     caption += `⭐ \`IMDB:\` *${cartoonInfo.imdb_rating || "N/A"}*\n`;
                     caption += `💿 \`QUALITY:\` *${cartoonInfo.quality || "N/A"}*\n\n`;
@@ -184,7 +190,7 @@ gmd(
                     const dlUrl = `https://ck-api-v1.vercel.app/movie/cartoon/dl?url=${encodeURIComponent(cartoonLink)}`;
                     const { data: dlResponse } = await axios.get(dlUrl);
 
-                    const dlData = dlResponse.results || dlResponse.data || dlResponse;
+                    const dlData = dlResponse?.results || dlResponse?.data || dlResponse;
 
                     if (!dlData || !dlData.direct_links || !dlData.direct_links.length) {
                         await react("❌");
@@ -194,7 +200,7 @@ gmd(
                     const directLinks = dlData.direct_links;
                     const dlDateNow = Date.now();
 
-                    // 3. Interactive List Rows සකස් කිරීම
+                    // Interactive List Rows
                     const buttonRows = directLinks.map((linkObj, i) => ({
                         header: `Option ${i + 1}`,
                         title: `${linkObj.name || "Download Link"}`,
@@ -216,7 +222,7 @@ gmd(
 
                     await sendInteractiveMessage(Gifted, from, {
                         text: '🔽 *Please select your preferred cartoon file/episode below:*',
-                        footer: botFooter,
+                        footer: safeFooter,
                         interactiveButtons: [
                             {
                                 name: 'single_select',
@@ -233,11 +239,11 @@ gmd(
                 }
             };
 
-            // 4. Link/Episode Selection Listener
+            // 3. Link Selection Listener
             const linkSelectionListener = async (update2) => {
                 try {
                     const msg2 = update2.messages[0];
-                    if (!msg2.message) return;
+                    if (!msg2 || !msg2.message) return;
 
                     const selectedLinkId = extractButtonId(msg2.message);
                     if (!selectedLinkId || !selectedLinkId.startsWith("cartoon_link_")) return;
@@ -251,7 +257,7 @@ gmd(
 
                     const linkIndex = parseInt(parts[3]);
                     const finalSelectedLink = session.directLinks[linkIndex];
-                    const finalDownloadUrl = finalSelectedLink.url || finalSelectedLink.link;
+                    const finalDownloadUrl = finalSelectedLink?.url || finalSelectedLink?.link;
 
                     if (!finalDownloadUrl) {
                         await react("❌");
@@ -264,11 +270,10 @@ gmd(
 
                     await react("⬆️");
 
-                    // Send Video Document
                     await Gifted.sendMessage(from, {
                         document: { url: finalDownloadUrl },
                         mimetype: "video/mp4",
-                        fileName: `${finalSelectedLink.name || session.cartoonInfo.title}.mp4`,
+                        fileName: `${finalSelectedLink.name || session.cartoonInfo.title || "Cartoon"}.mp4`,
                         jpegThumbnail: thumb,
                         caption: `🎬 \`${finalSelectedLink.name || session.cartoonInfo.title}\`\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
                     }, { quoted: ck });
@@ -281,11 +286,9 @@ gmd(
                 }
             };
 
-            // Event Listeners Registering
             Gifted.ev.on("messages.upsert", cartoonSelectionListener);
             Gifted.ev.on("messages.upsert", linkSelectionListener);
 
-            // Timeout Listener Cleanup (10 Mins)
             setTimeout(() => {
                 Gifted.ev.off("messages.upsert", cartoonSelectionListener);
                 Gifted.ev.off("messages.upsert", linkSelectionListener);
