@@ -8,7 +8,7 @@ const {
 } = require("gifted-baileys");
 const { sendInteractiveMessage } = require("gifted-btns");
 
-// Custom Quoted Context (ck object).
+// Custom Quoted Context (ck object)
 const ck = {
     key: {
         fromMe: false,
@@ -40,7 +40,10 @@ function extractButtonId(msg) {
 
 async function createThumbnail(url) {
     try {
-        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        const response = await axios.get(url, { 
+            responseType: 'arraybuffer',
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+        });
         return await sharp(response.data)
             .resize(300, 300)
             .jpeg({ quality: 80 })
@@ -51,7 +54,7 @@ async function createThumbnail(url) {
     }
 }
 
-// Global Map එක හරහා Active Sessions පාලනය කිරීම
+// Active Sessions පාලනයට Global Map එකක්
 const activeQualitySessions = new Map();
 
 gmd(
@@ -73,7 +76,6 @@ gmd(
             await react("🎬");
 
             const dateNow = Date.now();
-            // 1. Search API Fetching
             const searchUrl = `https://ck-animostlk-api-abcxyz.vercel.app/api/search?q=${encodeURIComponent(q)}`;
             const { data } = await axios.get(searchUrl);
 
@@ -84,7 +86,7 @@ gmd(
 
             const moviesSlice = data.results.slice(0, 10);
             
-            // Carousel Cards සකස් කිරීම
+            // Carousel Cards සැකසීම
             const cards = await Promise.all(
                 moviesSlice.map(async (movie, index) => {
                     const mediaContent = await generateWAMessageContent(
@@ -137,7 +139,7 @@ gmd(
             await Gifted.relayMessage(from, carouselMessage.message, { messageId: carouselMessage.key.id });
             await react("✅");
 
-            // 2. DOWNLOAD Button Click Listener
+            // 1. Movie Click Listener
             const movieSelectionListener = async (update) => {
                 try {
                     const msg = update.messages[0];
@@ -152,19 +154,17 @@ gmd(
 
                     await react("⏳");
 
-                    // Movie Info Fetching
                     const infoUrl = `https://ck-animostlk-api-abcxyz.vercel.app/api/info?url=${encodeURIComponent(selectedMovie.link)}`;
                     const infoResponse = await axios.get(infoUrl);
 
                     if (!infoResponse.data.status) {
                         await react("❌");
-                        return reply("❌ Failed to fetch movie details from AnimostLK.", msg);
+                        return reply("❌ Failed to fetch movie details.", msg);
                     }
 
                     const movie = infoResponse.data;
                     const details = movie.details || {};
 
-                    // Caption එක සැකසීම
                     let caption = `🎬 \`${movie.title}\`\n\n`;
                     caption += `📅 \`RELEASE DATE:\` *${details.release_date || "N/A"}*\n`;
                     caption += `🎬 \`DIRECTOR:\` *${details.director || "N/A"}*\n`;
@@ -172,7 +172,6 @@ gmd(
                     caption += `💰 \`BOX OFFICE:\` *${details.box_office || "N/A"}*\n\n`;
                     caption += `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`;
 
-                    // Poster එක සහ විස්තර යැවීම
                     await Gifted.sendMessage(from, {
                         image: { url: movie.image_link || selectedMovie.image_link },
                         caption: caption
@@ -180,7 +179,6 @@ gmd(
 
                     const dlDateNow = Date.now();
 
-                    // 3. Quality Selection Interactive List සකස් කිරීම
                     const buttonRows = (movie.download_links || []).map((dl, i) => ({
                         header: `${dl.quality}`,
                         title: `Download ${dl.quality}`,
@@ -190,20 +188,14 @@ gmd(
 
                     if (buttonRows.length === 0) {
                         await react("❌");
-                        return reply("❌ No download links available for this movie.", msg);
+                        return reply("❌ No download links available.", msg);
                     }
 
                     const buttonParams = {
                         title: '🟢 Select Video Quality',
-                        sections: [
-                            {
-                                title: '📥 Available Download Links',
-                                rows: buttonRows
-                            }
-                        ]
+                        sections: [{ title: '📥 Available Download Links', rows: buttonRows }]
                     };
 
-                    // Session Data Save කිරීම
                     activeQualitySessions.set(dlDateNow, { movie, downloads: movie.download_links });
 
                     await sendInteractiveMessage(Gifted, from, {
@@ -225,7 +217,7 @@ gmd(
                 }
             };
 
-            // 4. Document එකක් ලෙස Video එක යැවීමේ Listener
+            // 2. Quality Download Listener
             const qualityListener = async (update2) => {
                 try {
                     const msg2 = update2.messages[0];
@@ -246,7 +238,6 @@ gmd(
 
                     await react("⬇️");
 
-                    // Direct worker/cloud link එක ලබා ගැනීම
                     const directLink = finalQuality.link;
 
                     if (!directLink) {
@@ -254,10 +245,29 @@ gmd(
                         return reply("❌ Direct download link not found.", msg2);
                     }
 
+                    // 🛠️ FIX: Direct Link Verification & Block Prevention
+                    try {
+                        const headRes = await axios.head(directLink, {
+                            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                            timeout: 10000
+                        });
+
+                        const contentLength = parseInt(headRes.headers['content-length'] || "0");
+                        const contentType = headRes.headers['content-type'] || "";
+
+                        // File size එක 5MB වලට අඩු නම් හෝ Content-Type එක text/html නම් KB ගාණක HTML එකක් බව තහවුරු වේ
+                        if ((contentLength > 0 && contentLength < 5 * 1024 * 1024) || contentType.includes('text/html')) {
+                            await react("❌");
+                            return reply(`⚠️ *Direct File Send Failed!*\n\nThe server provided a web page or blocked direct access instead of the video.\n\n🔗 *Direct Download Link:* ${directLink}`, msg2);
+                        }
+                    } catch (e) {
+                        console.log("HEAD verification skipped/failed:", e.message);
+                    }
+
                     await react("⬆️");
                     const thumb = await createThumbnail(session.movie.image_link);
 
-                    // Video File එක Document එකක් ලෙස යැවීම
+                    // Document එකක් ලෙස වීඩියෝව යැවීම
                     await Gifted.sendMessage(from, {
                         document: { url: directLink },
                         mimetype: "video/mp4",
@@ -271,6 +281,7 @@ gmd(
                 } catch (err) {
                     console.error(err);
                     await react("❌");
+                    reply(`❌ Failed to send document: ${err.message || err}`, msg2);
                 }
             };
 
@@ -278,7 +289,7 @@ gmd(
             Gifted.ev.on("messages.upsert", movieSelectionListener);
             Gifted.ev.on("messages.upsert", qualityListener);
 
-            // ⏱️ විනාඩි 5කට (මිලිතත්පර 300,000) පසු Listeners & Active Sessions Clear කර දැමීම
+            // ⏱️ විනාඩි 5කට (300,000ms) පසු Listeners Clear වීම
             setTimeout(() => {
                 Gifted.ev.off("messages.upsert", movieSelectionListener);
                 Gifted.ev.off("messages.upsert", qualityListener);
