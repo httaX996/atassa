@@ -4,7 +4,7 @@ const sharp = require('sharp');
 const config = require('../config');
 const { sendInteractiveMessage } = require("gifted-btns");
 
-// Custom Quoted Context (ck object)
+// Custom Quoted Context (ck object
 const ck = {
     key: {
         fromMe: false,
