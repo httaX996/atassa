@@ -2,9 +2,13 @@ const { gmd } = require("../gift");
 const axios = require('axios');
 const sharp = require('sharp');
 const config = require('../config');
+const {
+    generateWAMessageContent,
+    generateWAMessageFromContent,
+} = require("gifted-baileys");
 const { sendInteractiveMessage } = require("gifted-btns");
 
-// Custom Quoted Context (ck object}
+// Custom Quoted Context (ck object)
 const ck = {
     key: {
         fromMe: false,
@@ -53,7 +57,7 @@ gmd(
         pattern: "cartoon",
         category: "download",
         aliases: ["cartoons"],
-        description: "Search cartoons with Buttons",
+        description: "Search cartoons with Carousel and Buttons",
     },
     async (from, Gifted, conText) => {
         const { q, reply, react, botFooter } = conText;
@@ -63,7 +67,7 @@ gmd(
         try {
             if (!q) {
                 await react("❌");
-                return reply("🧸 Please provide a cartoon name.\n\nExample:\n.cartoon ben 10");
+                return reply("🧸 Please provide a cartoon name.\n\nExample:\n.cartoon garfield");
             }
 
             await react("🧸");
@@ -74,55 +78,81 @@ gmd(
             const searchUrl = `https://ck-api-v1.vercel.app/movie/cartoon/search?q=${encodeURIComponent(q)}`;
             const { data: searchData } = await axios.get(searchUrl);
 
-            if (!searchData || !searchData.success || !searchData.results || !searchData.results.length) {
+            // API Response Data Validation (Check data array or results)
+            const resultsList = searchData?.data || searchData?.results;
+
+            if (!searchData || !searchData.success || !resultsList || !resultsList.length) {
                 await react("❌");
                 return reply("❌ No cartoons found.");
             }
 
-            const cartoonsSlice = searchData.results.slice(0, 10);
+            const cartoonsSlice = resultsList.slice(0, 10);
 
-            // 2. Build Interactive Select Menu for Search Results
-            const searchRows = cartoonsSlice.map((cartoon, index) => ({
-                header: `Result ${index + 1}`,
-                title: cartoon.title || "Cartoon",
-                description: `Click to select this cartoon`,
-                id: `cartoon_select_${index}_${dateNow}`
-            }));
+            // 2. Build Dynamic Carousel Cards
+            const cards = await Promise.all(
+                cartoonsSlice.map(async (cartoon, index) => {
+                    const mediaContent = await generateWAMessageContent(
+                        { image: { url: cartoon.image || config.IMG_URL } },
+                        { upload: Gifted.waUploadToServer }
+                    );
 
-            const searchButtonParams = {
-                title: '🧸 Select a Cartoon',
-                sections: [
-                    {
-                        title: `Search Results for: ${q}`,
-                        rows: searchRows
-                    }
-                ]
-            };
+                    return {
+                        header: {
+                            title: `🎬 *${cartoon.title}*`,
+                            hasMediaAttachment: true,
+                            imageMessage: mediaContent.imageMessage,
+                        },
+                        body: {
+                            text: `✨ Click the button below to select options for this cartoon.`,
+                        },
+                        footer: { text: `> ${safeFooter}` },
+                        nativeFlowMessage: {
+                            buttons: [
+                                {
+                                    name: "quick_reply",
+                                    buttonParamsJson: JSON.stringify({
+                                        display_text: "📥 DOWNLOAD",
+                                        id: `cartoon_dl_${index}_${dateNow}`
+                                    }),
+                                }
+                            ],
+                        },
+                    };
+                })
+            );
 
-            await sendInteractiveMessage(Gifted, from, {
-                text: `🔍 *𝗖𝗞 𝗖𝗔𝗥𝗧𝗢𝗢𝗡 𝗦𝗘𝗔𝗥𝗖𝗛*\n\nResults found for: *${q}*\nSelect a cartoon from the list below:`,
-                footer: safeFooter,
-                interactiveButtons: [
-                    {
-                        name: 'single_select',
-                        buttonParamsJson: JSON.stringify(searchButtonParams)
-                    }
-                ]
-            }, { quoted: ck });
+            // Carousel Message Construct
+            const carouselMessage = generateWAMessageFromContent(
+                from,
+                {
+                    viewOnceMessage: {
+                        message: {
+                            messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
+                            interactiveMessage: {
+                                body: { text: `🔍 *𝗖𝗞 𝗖𝗔𝗥𝗧𝗢𝗢𝗡 𝗦𝗘𝗔𝗥𝗖𝗛*\n\nResults for: *${q}*` },
+                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*` },
+                                carouselMessage: { cards },
+                            },
+                        },
+                    },
+                },
+                { quoted: ck }
+            );
 
+            await Gifted.relayMessage(from, carouselMessage.message, { messageId: carouselMessage.key.id });
             await react("✅");
 
             // Session tracking Map
             const activeCartoonSessions = new Map();
 
-            // 3. Cartoon Selection Listener
+            // 3. Cartoon Selection Listener (Carousel Button Listener)
             const cartoonSelectionListener = async (update) => {
                 try {
                     const msg = update.messages[0];
                     if (!msg || !msg.message) return;
 
                     const selectedButtonId = extractButtonId(msg.message);
-                    if (!selectedButtonId || !selectedButtonId.includes(`_${dateNow}`) || !selectedButtonId.startsWith("cartoon_select_")) return;
+                    if (!selectedButtonId || !selectedButtonId.includes(`_${dateNow}`) || !selectedButtonId.startsWith("cartoon_dl_")) return;
                     if (msg.key?.remoteJid !== from) return;
 
                     const cartoonIndex = parseInt(selectedButtonId.split("_")[2]);
