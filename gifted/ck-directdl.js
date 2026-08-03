@@ -3,6 +3,26 @@ const axios = require("axios");
 const sharp = require("sharp");
 const path = require("path");
 
+const ck = {
+    key: {
+        fromMe: false,
+        participant: "0@s.whatsapp.net",
+        remoteJid: "status@broadcast"
+    },
+    message: {
+        contactMessage: {
+            displayName: "〴ᴄʜᴇᴛʜᴍɪɴᴀ ×͜×",
+            vcard: `BEGIN:VCARD
+VERSION:3.0
+FN:Meta
+ORG:META AI;
+TEL;type=CELL;type=VOICE;waid=13135550002:+13135550002
+END:VCARD`
+        }
+    }
+};
+
+
 /* ================= MIME TYPE AUTO DETECT ================= */
 
 function getMimeType(fileName, fallback) {
@@ -168,29 +188,29 @@ gmd(
 
             // Info message
             await Gifted.sendMessage(from, {
-                text: `🎬 \`CK CineMAX DOWNLOADER\` 🎬\n\n` +
-                      `📃 \`File name:\` *${fileData.fileName}*\n` +
-                      `💈 \`File Size:\` *${fileData.fileSize}*\n` +
-                      `🕹️ \`File type:\` *${fileData.mimetype}*\n\n` +
+                text: `📥 \`CK DIRECT DOWNLOADER\` 📥\n\n` +
+                      `📃 \`NAME:\` *${fileData.fileName}*\n` +
+                      `💈 \`SIZE:\` *${fileData.fileSize}*\n` +
+                      `🕹️ \`TYPE:\` *${fileData.mimetype}*\n\n` +
                       `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
-            }, { quoted: m });
+            }, { quoted: ck });
 
             await react("⬆️");
 
             // Build Message Payload
             const docPayload = {
                 document: { url: fileData.downloadUrl },
-                fileName: `🎬 CK CineMAX 🎬 ${fileData.fileName}`,
+                fileName: `${fileData.fileName}`,
                 mimetype: fileData.mimetype,
-                caption: `🍿 \`${fileData.fileName}\`\n\n> ⚡ ᴘᴏᴡᴇʀᴇඩ් ʙʏ *CK CineMAX*`
+                caption: `\`${fileData.fileName}\`\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
             };
 
-            if (thumb) {
-                docPayload.jpegThumbnail = thumb;
-            }
+           // if (thumb) {
+            //    docPayload.jpegThumbnail = thumb;
+         //   }
 
             // Send file as Document
-            await Gifted.sendMessage(from, docPayload, { quoted: m });
+            await Gifted.sendMessage(from, docPayload, { quoted: ck });
 
             await react("✅");
 
