@@ -2,10 +2,6 @@ const { gmd } = require("../gift");
 const axios = require('axios');
 const sharp = require('sharp');
 const config = require('../config');
-const {
-    generateWAMessageContent,
-    generateWAMessageFromContent,
-} = require("gifted-baileys");
 const { sendInteractiveMessage } = require("gifted-btns");
 
 // Custom Quoted Context (ck object)
@@ -56,7 +52,7 @@ gmd(
         pattern: "cineck",
         category: "movie",
         aliases: ["cinesubz", "cine"],
-        description: "Search movies from CineSubz with Carousel and Buttons",
+        description: "Search movies from CineSubz with Buttons",
     },
     async (from, Gifted, conText) => {
         const { q, reply, react, botFooter } = conText;
@@ -80,62 +76,42 @@ gmd(
             }
 
             const moviesSlice = data.results.slice(0, 10);
-            const cards = await Promise.all(
-                moviesSlice.map(async (movie, index) => {
-                    const mediaContent = await generateWAMessageContent(
-                        { image: { url: movie.image || config.IMG_URL } },
-                        { upload: Gifted.waUploadToServer }
-                    );
+            
+            // Carousel වෙනුවට Interactive List එකක් සකස් කිරීම
+            const buttonRows = moviesSlice.map((movie, index) => ({
+                header: `🎬 Result ${index + 1}`,
+                title: movie.title.substring(0, 50), // Title එක දිග වැඩි වුණොත් කපා හැරීමට
+                description: `Click to view options`,
+                id: `cine_dl_${index}_${dateNow}`
+            }));
 
-                    return {
-                        header: {
-                            title: `🎬 *${movie.title}*`,
-                            hasMediaAttachment: true,
-                            imageMessage: mediaContent.imageMessage,
-                        },
-                        body: {
-                            text: `✨ Click the button below to fetch available options.`,
-                        },
-                        footer: { text: `> ${botFooter}` },
-                        nativeFlowMessage: {
-                            buttons: [
-                                {
-                                    name: "quick_reply",
-                                    buttonParamsJson: JSON.stringify({
-                                        display_text: "📥 DOWNLOAD",
-                                        id: `cine_dl_${index}_${dateNow}`
-                                    }),
-                                }
-                            ],
-                        },
-                    };
-                })
-            );
+            const buttonParams = {
+                title: '🔍 Select a Movie',
+                sections: [
+                    {
+                        title: '🎬 Available Movies',
+                        rows: buttonRows
+                    }
+                ]
+            };
 
-            const carouselMessage = generateWAMessageFromContent(
-                from,
-                {
-                    viewOnceMessage: {
-                        message: {
-                            messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
-                            interactiveMessage: {
-                                body: { text: `🔍 𝗖𝗞 𝗖𝗜𝗡𝗘𝗦𝗨𝗕𝗭 𝗦𝗘𝗔𝗥𝗖𝗛 \n\nResults for: *${q}*` },
-                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*` },
-                                carouselMessage: { cards },
-                            },
-                        },
-                    },
-                },
-                { quoted: ck }
-            );
+            await sendInteractiveMessage(Gifted, from, {
+                text: `🔍 *𝗖𝗞 𝗖𝗜𝗡𝗘𝗦𝗨𝗕𝗭 𝗦𝗘𝗔𝗥𝗖𝗛* \n\nResults for: *${q}*`,
+                footer: botFooter,
+                interactiveButtons: [
+                    {
+                        name: 'single_select',
+                        buttonParamsJson: JSON.stringify(buttonParams)
+                    }
+                ]
+            }, { quoted: ck });
 
-            await Gifted.relayMessage(from, carouselMessage.message, { messageId: carouselMessage.key.id });
             await react("✅");
 
-            // Global/Session tracking Maps (Nested Listeners වල Memory Leaks මඟ හැරීමට)
+            // Global/Session tracking Maps
             const activeQualitySessions = new Map();
 
-            // 2. DOWNLOAD බටන් ලිස්නර් එක (විනාඩි 10ක් පුරා ක්‍රියාත්මක වන පරිදි 'off' නොකර තබා ගනී)
+            // 2. DOWNLOAD බටන් ලිස්නර් එක
             const movieSelectionListener = async (update) => {
                 try {
                     const msg = update.messages[0];
@@ -178,24 +154,23 @@ gmd(
                     const dlDateNow = Date.now();
 
                     // 3. Quality Interactive List එක සකස් කිරීම
-                    const buttonRows = movie.downloads.map((dl, i) => ({
+                    const qualityButtonRows = movie.downloads.map((dl, i) => ({
                         header: `${dl.quality}`,
                         title: `Download ${dl.quality}`,
                         description: `Size: ${dl.size}`,
                         id: `cine_link_${movieIndex}_${i}_${dlDateNow}`
                     }));
 
-                    const buttonParams = {
+                    const qualityButtonParams = {
                         title: '🟢 Select Video Quality',
                         sections: [
                             {
                                 title: '📥 Available Download Links',
-                                rows: buttonRows
+                                rows: qualityButtonRows
                             }
                         ]
                     };
 
-                    // මෙම නිශ්චිත Quality list එකට අදාළ දත්ත Save කර ගැනීම
                     activeQualitySessions.set(dlDateNow, { movie, downloads: movie.downloads });
 
                     await sendInteractiveMessage(Gifted, from, {
@@ -204,7 +179,7 @@ gmd(
                         interactiveButtons: [
                             {
                                 name: 'single_select',
-                                buttonParamsJson: JSON.stringify(buttonParams)
+                                buttonParamsJson: JSON.stringify(qualityButtonParams)
                             }
                         ]
                     }, { quoted: ck });
@@ -228,9 +203,8 @@ gmd(
                     if (msg2.key?.remoteJid !== from) return;
 
                     const parts = selectedQualityId.split("_");
-                    const dlTimestamp = parseInt(parts[4]); // dlDateNow එක ලබා ගැනීම
+                    const dlTimestamp = parseInt(parts[4]);
 
-                    // Session එක වලංගු එකක්දැයි බැලීම
                     if (!activeQualitySessions.has(dlTimestamp)) return;
                     const session = activeQualitySessions.get(dlTimestamp);
 
@@ -239,7 +213,6 @@ gmd(
 
                     await react("⬇️");
 
-                    // අලුත් dl API එකට යැවීම
                     const dlUrl = `https://chethmina-kavishan-cinesubz-api-v1.vercel.app/api/dl?url=${encodeURIComponent(finalQuality.download_link)}`;
                     const dlResponse = await axios.get(dlUrl);
 
@@ -250,7 +223,6 @@ gmd(
 
                     const initialDlUrl = dlResponse.data.data.download_url;
 
-                    // sadas dev api එකට download_url එක දැමීම
                     const finalSadasUrl = `https://apis.sadas.dev/api/v1/movie/cinesubz/dl?q=${encodeURIComponent(initialDlUrl)}&apiKey=ea4d57a2a2db72e0bb3ba58f56b1ff9b`;
                     const sadasResponse = await axios.get(finalSadasUrl);
 
@@ -260,7 +232,6 @@ gmd(
                     }
 
                     const links = sadasResponse.data.data.links || [];
-                    // ටෙලිග්‍රෑම් නැති ලින්ක් එක පෙරීම
                     const directLink = links.find(link => !link.includes("t.me") && !link.includes("telegram"));
 
                     if (!directLink) {
@@ -271,13 +242,12 @@ gmd(
                     await react("⬆️");
                     const thumb = await createThumbnail(session.movie.poster);
 
-                    // Document එකක් ලෙස වීඩියෝව යැවීම
                     await Gifted.sendMessage(from, {
                         document: { url: directLink },
                         mimetype: "video/mp4",
                         fileName: `${sadasResponse.data.data.title || session.movie.title}.mp4`,
                         jpegThumbnail: thumb,
-                        caption: `🎬 \`${session.movie.title}\`\n\n🎞️ \`Quality:\` *${finalQuality.quality}*\n📦 \`Size:\` *${finalQuality.size}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+                        caption: `🎬 \`${session.movie.title}\`\n\n🎞️ \`Quality:\` *${finalQuality.quality}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
                     }, { quoted: ck });
 
                     await react("✅");
@@ -288,11 +258,9 @@ gmd(
                 }
             };
 
-            // Listeners දෙකම Register කිරීම
             Gifted.ev.on("messages.upsert", movieSelectionListener);
             Gifted.ev.on("messages.upsert", qualityListener);
 
-            // විනාඩි 10කට (මිලිතත්පර 600,000) පසු Listeners දෙකම සම්පූර්ණයෙන් Clear කර දැමීම
             setTimeout(() => {
                 Gifted.ev.off("messages.upsert", movieSelectionListener);
                 Gifted.ev.off("messages.upsert", qualityListener);
