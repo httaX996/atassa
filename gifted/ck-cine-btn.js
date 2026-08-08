@@ -75,7 +75,7 @@ gmd(
                 return reply("❌ No movies found.");
             }
 
-            const moviesSlice = data.results.slice(0, 10);
+            const moviesSlice = data.results.slice(0, 50);
             
             // Carousel වෙනුවට Interactive List එකක් සකස් කිරීම
             const buttonRows = moviesSlice.map((movie, index) => ({
