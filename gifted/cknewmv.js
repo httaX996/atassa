@@ -96,7 +96,7 @@ gmd(
             };
 
             await sendInteractiveMessage(Gifted, from, {
-                text: `🔍 *𝗦𝗧𝗔𝗚𝗔𝗧𝗩 𝗦𝗘𝗔𝗥𝗖𝗛* \n\nResults for: *${q}*`,
+                text: `🔍 𝗖𝗞 𝗦𝗧𝗔𝗚𝗔𝗧𝗩 𝗦𝗘𝗔𝗥𝗖𝗛\n\nResults for: *${q}*`,
                 footer: botFooter,
                 interactiveButtons: [
                     {
@@ -228,7 +228,7 @@ gmd(
                         mimetype: mimeType,
                         fileName: fileName,
                         jpegThumbnail: thumb,
-                        caption: `🎬 \`${session.movie.title}\`\n\n🎞️ \`Quality:\` *${dlData.quality || "N/A"}*\n📁 \`File:\` *${fileName}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+                        caption: `🎬 \`${fileName}\`\n🎞️ \`Quality:\` *${dlData.quality || "N/A"}\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
                     }, { quoted: ck });
 
                     await react("✅");
