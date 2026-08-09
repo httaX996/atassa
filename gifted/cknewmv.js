@@ -228,7 +228,7 @@ gmd(
                         mimetype: mimeType,
                         fileName: fileName,
                         jpegThumbnail: thumb,
-                        caption: `🎬 \`${fileName}\`\n🎞️ \`Quality:\` *${dlData.quality || "N/A"}\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+                        caption: `🎬 \`${fileName}\`\n🎞️ \`Quality:\` *${dlData.quality || "N/A"}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
                     }, { quoted: ck });
 
                     await react("✅");
