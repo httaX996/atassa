@@ -56,7 +56,7 @@ gmd(
         pattern: "pupil",
         category: "movie",
         aliases: ["pupilvideo", "pvideo"],
-        description: "Search movies from PupilVideo with Carousel and Buttons",
+        description: "Search movies from PupilVideo with Interactive List Selection",
     },
     async (from, Gifted, conText) => {
         const { q, reply, react, botFooter } = conText;
@@ -79,61 +79,43 @@ gmd(
                 return reply("❌ No movies found.");
             }
 
-            // 1. සර්ච් රිසල්ට් වලින් මුල් කාඩ් 10 සකස් කිරීම (Carousel Style)
-            const moviesSlice = results.slice(0, 10);
-            const cards = await Promise.all(
-                moviesSlice.map(async (movie, index) => {
-                    const mediaContent = await generateWAMessageContent(
-                        { image: { url: movie.image || config.IMG_URL || "https://i.ibb.co/689v0p7/movie-default.jpg" } },
-                        { upload: Gifted.waUploadToServer }
-                    );
+            // 1. සර්ච් රිසල්ට් වලින් මුල් කාඩ් 10 සකස් කිරීම (Interactive List Style)
+            const moviesSlice = results.slice(0, 50);
+            
+            const rows = moviesSlice.map((movie, index) => ({
+                header: `🎬 ${movie.title}`,
+                title: movie.title,
+                description: `Source: PupilVideo | Tap to select`,
+                id: `pupil_dl_${index}_${dateNow}`
+            }));
 
-                    return {
-                        header: {
-                            title: `🎬 *${movie.title}*`,
-                            hasMediaAttachment: true,
-                            imageMessage: mediaContent.imageMessage,
-                        },
-                        body: {
-                            text: `🎭 Title: ${movie.title}\n🔗 Source: PupilVideo`,
-                        },
-                        footer: { text: `> ${botFooter}` },
-                        nativeFlowMessage: {
-                            buttons: [
-                                {
-                                    name: "quick_reply",
-                                    buttonParamsJson: JSON.stringify({
-                                        display_text: "📥 DOWNLOAD",
-                                        id: `pupil_dl_${index}_${dateNow}`
-                                    }),
-                                }
-                            ],
-                        },
-                    };
-                })
-            );
-
-            const carouselMessage = generateWAMessageFromContent(
-                from,
+            const sections = [
                 {
-                    viewOnceMessage: {
-                        message: {
-                            messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
-                            interactiveMessage: {
-                                body: { text: `🔍 𝗣𝗨𝗣𝗜𝗟 𝗠𝗢𝗩𝗜𝗘 𝗦𝗘𝗔𝗥𝗖𝗛 \n\nResults for: *${q}*` },
-                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*` },
-                                carouselMessage: { cards },
-                            },
-                        },
-                    },
-                },
-                { quoted: ck }
-            );
+                    title: '🎥 Search Results',
+                    rows: rows
+                }
+            ];
 
-            await Gifted.relayMessage(from, carouselMessage.message, { messageId: carouselMessage.key.id });
+            const buttonParams = {
+                title: '🟢 Select Movie',
+                sections: sections
+            };
+
+            // 2. ෂෝ ලිස්ට් බටන් එක යැවීම (Carousel වෙනුවට List එකක් ලෙස)
+            await sendInteractiveMessage(Gifted, from, {
+                text: `🔍 𝗣𝗨𝗣𝗜𝗟 𝗠𝗢𝗩𝗜𝗘 𝗦𝗘𝗔𝗥𝗖🇭 \n\nResults for: *${q}*\n\nPlease select your movie from the list below:`,
+                footer: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`,
+                interactiveButtons: [
+                    {
+                        name: 'single_select',
+                        buttonParamsJson: JSON.stringify(buttonParams)
+                    }
+                ]
+            }, { quoted: ck });
+
             await react("✅");
 
-            // 2. DOWNLOAD බටන් ක්ලික් එක හැඬ්ල් කරන ලිස්නර් එක
+            // 3. DOWNLOAD බටන් ක්ලික් එක හැඬ්ල් කරන ලිස්නර් එක
             const movieSelectionListener = async (update) => {
                 try {
                     const msg = update.messages[0];
@@ -179,11 +161,11 @@ gmd(
                     }, { quoted: ck });
 
                     const dlDateNow = Date.now();
-                    const sections = [];
+                    const linkSections = [];
 
                     // Direct Links Section
                     if (directLinks.length > 0) {
-                        sections.push({
+                        linkSections.push({
                             title: '🌐 Direct Download Links',
                             rows: mappedDirect.map((dl) => ({
                                 header: `🟢 ${dl.quality}`,
@@ -196,7 +178,7 @@ gmd(
 
                     // Telegram Links Section
                     if (telegramLinks.length > 0) {
-                        sections.push({
+                        linkSections.push({
                             title: '🔹 Telegram Download Links',
                             rows: mappedTelegram.map((tl) => ({
                                 header: `🔵 ${tl.quality}`,
@@ -207,31 +189,31 @@ gmd(
                         });
                     }
 
-                    if (sections.length === 0) {
+                    if (linkSections.length === 0) {
                         await react("❌");
                         return reply("❌ No download links found for this movie.", msg);
                     }
 
-                    const buttonParams = {
+                    const buttonParamsLinks = {
                         title: '🟢 Select Video Link Type & Quality',
-                        sections: sections
+                        sections: linkSections
                     };
 
-                    // 3. Quality Interactive List බටන් එක යැවීම
+                    // 4. Quality Interactive List බටන් එක යැවීම
                     await sendInteractiveMessage(Gifted, from, {
                         text: '🔽 *Please select your preferred download method and quality below:*',
                         footer: botFooter,
                         interactiveButtons: [
                             {
                                 name: 'single_select',
-                                buttonParamsJson: JSON.stringify(buttonParams)
+                                buttonParamsJson: JSON.stringify(buttonParamsLinks)
                             }
                         ]
                     }, { quoted: ck });
 
                     await react("✅");
 
-                    // 4. අවසාන Quality බටන් එක ක්ලික් කල පසු ඩොකියුමන්ට් එකක් ලෙස යැවීම
+                    // 5. අවසාන Quality බටන් එක ක්ලික් කල පසු ඩොකියුමන්ට් එකක් ලෙස යැවීම
                     const qualityListener = async (update2) => {
                         try {
                             const msg2 = update2.messages[0];
@@ -312,3 +294,4 @@ gmd(
         }
     }
 );
+
