@@ -66,7 +66,7 @@ gmd(
         pattern: "mvbox",
         category: "movie",
         aliases: ["moviebox", "mbox"],
-        description: "Search movies from MovieBox with Carousel and Buttons",
+        description: "Search movies from MovieBox with Interactive List",
     },
     async (from, Gifted, conText) => {
         const { q, reply, react, botFooter } = conText;
@@ -96,58 +96,39 @@ gmd(
                 return reply("❌ No movies found.");
             }
 
-            // 1. සර්ච් රිසල්ට් වලින් මුල් කාඩ් 10 සකස් කිරීම
-            const moviesSlice = moviesList.slice(0, 10);
-            const cards = await Promise.all(
-                moviesSlice.map(async (movie, index) => {
-                    const mediaContent = await generateWAMessageContent(
-                        { image: { url: movie.poster || config.IMG_URL } },
-                        { upload: Gifted.waUploadToServer }
-                    );
+            // 1. සර්ච් රිසල්ට් වලින් මුල් කාඩ් 10 සකස් කර අන්තර්ක්‍රියාකාරී ලැයිස්තුවක් (Interactive List) ලෙස යැවීම
+            const moviesSlice = moviesList.slice(0, 50);
+            
+            const buttonRows = moviesSlice.map((movie, index) => {
+                return {
+                    header: `🎬 ${movie.title}`,
+                    title: `${movie.title.substring(0, 24)}`,
+                    description: `Year: ${movie.year || "N/A"} | Rating: ${movie.rating || "N/A"} | Type: ${movie.type || "unknown"}`,
+                    id: `mv_dl_${index}_${dateNow}`
+                };
+            });
 
-                    return {
-                        header: {
-                            title: `🎬 *${movie.title}*`,
-                            hasMediaAttachment: true,
-                            imageMessage: mediaContent.imageMessage,
-                        },
-                        body: {
-                            text: `📅 Year: ${movie.year || "N/A"}\n⭐ Rating: ${movie.rating || "N/A"}\n🎭 Type: ${movie.type || "unknown"}`,
-                        },
-                        footer: { text: `> ${botFooter}` },
-                        nativeFlowMessage: {
-                            buttons: [
-                                {
-                                    name: "quick_reply",
-                                    buttonParamsJson: JSON.stringify({
-                                        display_text: "📥 DOWNLOAD",
-                                        id: `mv_dl_${index}_${dateNow}`
-                                    }),
-                                }
-                            ],
-                        },
-                    };
-                })
-            );
+            const buttonParams = {
+                title: '🟢 Select Movie',
+                sections: [
+                    {
+                        title: '🔍 Search Results',
+                        rows: buttonRows
+                    }
+                ]
+            };
 
-            const carouselMessage = generateWAMessageFromContent(
-                from,
-                {
-                    viewOnceMessage: {
-                        message: {
-                            messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
-                            interactiveMessage: {
-                                body: { text: `🔍 𝗖𝗞 𝗠𝗢𝗩𝗜𝗘𝗕𝗢𝗫 𝗦𝗘𝗔𝗥𝗖𝗛 \n\nResults for: *${q}*` },
-                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*` },
-                                carouselMessage: { cards },
-                            },
-                        },
-                    },
-                },
-                { quoted: ck }
-            );
+            await sendInteractiveMessage(Gifted, from, {
+                text: `🔍 𝗖𝗞 𝗠𝗢𝗩𝗜𝗘𝗕𝗢𝗫 𝗦𝗘𝗔𝗥𝗖𝗛 \n\nResults for: *${q}*`,
+                footer: botFooter,
+                interactiveButtons: [
+                    {
+                        name: 'single_select',
+                        buttonParamsJson: JSON.stringify(buttonParams)
+                    }
+                ]
+            }, { quoted: ck });
 
-            await Gifted.relayMessage(from, carouselMessage.message, { messageId: carouselMessage.key.id });
             await react("✅");
 
             // 2. DOWNLOAD බටන් ක්ලික් එක හැඬ්ල් කරන ලිස්නර් එක
@@ -208,10 +189,10 @@ gmd(
                     const dlDateNow = Date.now();
 
                     // 3. Quality Interactive List බටන් සකස් කිරීම (TV Series විස්තර සහිතව)
-                    const buttonRows = downloadList.map((dl, i) => {
+                    const buttonRowsQuality = downloadList.map((dl, i) => {
                         const formattedSize = formatBytes(dl.size);
                         
-                        // Season සහ Episode අගයන් බිංදුවට වඩා වැඩි නම් (Series එකක් නම්) බටන් එකේ පෙන්වීමට සකස් කිරීම[span_0](start_span)[span_0](end_span)
+                        // Season සහ Episode අගයන් බිංදුවට වඩා වැඩි නම් (Series එකක් නම්) බටන් එකේ පෙන්වීමට සකස් කිරීම
                         const isRowSeries = dl.se > 0 || dl.ep > 0;
                         const rowSeriesInfo = isRowSeries ? `[S${String(dl.se).padStart(2, '0')}E${String(dl.ep).padStart(2, '0')}] ` : '';
 
@@ -223,12 +204,12 @@ gmd(
                         };
                     });
 
-                    const buttonParams = {
+                    const buttonParamsQuality = {
                         title: '🟢 Select Video Quality',
                         sections: [
                             {
                                 title: '📥 Available MovieBox Links',
-                                rows: buttonRows
+                                rows: buttonRowsQuality
                             }
                         ]
                     };
@@ -239,7 +220,7 @@ gmd(
                         interactiveButtons: [
                             {
                                 name: 'single_select',
-                                buttonParamsJson: JSON.stringify(buttonParams)
+                                buttonParamsJson: JSON.stringify(buttonParamsQuality)
                             }
                         ]
                     }, { quoted: ck });
@@ -275,7 +256,7 @@ gmd(
                             const thumb = await createThumbnail(movieDetails.poster || selectedMovie.poster);
                             const finalSize = formatBytes(finalQuality.size);
 
-                            // Season සහ Episode අගයන් බිංදුවට වඩා වැඩි නම් විස්තර නමට එකතු කිරීම[span_1](start_span)[span_1](end_span)
+                            // Season සහ Episode අගයන් බිංදුවට වඩා වැඩි නම් විස්තර නමට එකතු කිරීම[span_0](start_span)[span_0](end_span)
                             const isSeries = finalQuality.se > 0 || finalQuality.ep > 0;
                             const seriesInfo = isSeries ? `S${String(finalQuality.se).padStart(2, '0')}E${String(finalQuality.ep).padStart(2, '0')} ` : '';
                             const customFileName = `${movieDetails.title} ${seriesInfo}[${finalQuality.resolution}p].mp4`;
