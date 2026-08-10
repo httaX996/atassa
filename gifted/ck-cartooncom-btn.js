@@ -57,7 +57,7 @@ gmd(
         pattern: "cartoon",
         category: "download",
         aliases: ["cartoons"],
-        description: "Search cartoons with Carousel and Buttons",
+        description: "Search cartoons with List/Buttons selection",
     },
     async (from, Gifted, conText) => {
         const { q, reply, react, botFooter } = conText;
@@ -78,7 +78,7 @@ gmd(
             const searchUrl = `https://ck-api-v1.vercel.app/movie/cartoon/search?q=${encodeURIComponent(q)}`;
             const { data: searchData } = await axios.get(searchUrl);
 
-            // API Response Data Validation (Check data array or results)
+            // API Response Data Validation
             const resultsList = searchData?.data || searchData?.results;
 
             if (!searchData || !searchData.success || !resultsList || !resultsList.length) {
@@ -86,78 +86,62 @@ gmd(
                 return reply("❌ No cartoons found.");
             }
 
-            const cartoonsSlice = resultsList.slice(0, 10);
+            const cartoonsSlice = resultsList.slice(0, 50);
 
-            // 2. Build Dynamic Carousel Cards
-            const cards = await Promise.all(
-                cartoonsSlice.map(async (cartoon, index) => {
-                    const mediaContent = await generateWAMessageContent(
-                        { image: { url: cartoon.image || config.IMG_URL } },
-                        { upload: Gifted.waUploadToServer }
-                    );
+            // 2. Build Interactive List Rows for Search Results (Replacing Carousel)
+            const searchRows = cartoonsSlice.map((cartoon, index) => ({
+                header: `Result ${index + 1}`,
+                title: (cartoon.title || `Cartoon ${index + 1}`).substring(0, 24),
+                description: `Click to view details & download`,
+                id: `cartoon_dl_${index}_${dateNow}`
+            }));
 
-                    return {
-                        header: {
-                            title: `🎬 *${cartoon.title}*`,
-                            hasMediaAttachment: true,
-                            imageMessage: mediaContent.imageMessage,
-                        },
-                        body: {
-                            text: `✨ Click the button below to select options for this cartoon.`,
-                        },
-                        footer: { text: `> ${safeFooter}` },
-                        nativeFlowMessage: {
-                            buttons: [
-                                {
-                                    name: "quick_reply",
-                                    buttonParamsJson: JSON.stringify({
-                                        display_text: "📥 DOWNLOAD",
-                                        id: `cartoon_dl_${index}_${dateNow}`
-                                    }),
-                                }
-                            ],
-                        },
-                    };
-                })
-            );
-
-            // Carousel Message Construct
-            const carouselMessage = generateWAMessageFromContent(
-                from,
-                {
-                    viewOnceMessage: {
-                        message: {
-                            messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
-                            interactiveMessage: {
-                                body: { text: `🔍 *𝗖𝗞 𝗖𝗔𝗥𝗧𝗢𝗢𝗡 𝗦𝗘𝗔𝗥𝗖𝗛*\n\nResults for: *${q}*` },
-                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*` },
-                                carouselMessage: { cards },
-                            },
-                        },
-                    },
-                },
-                { quoted: ck }
-            );
-
-            await Gifted.relayMessage(from, carouselMessage.message, { messageId: carouselMessage.key.id });
-            await react("✅");
+            const searchListParams = {
+                title: '🎬 Select Cartoon Result',
+                sections: [
+                    {
+                        title: `🔍 Search Results for: ${q}`,
+                        rows: searchRows
+                    }
+                ]
+            };
 
             // Session tracking Map
             const activeCartoonSessions = new Map();
+            activeCartoonSessions.set(dateNow, { cartoonsSlice });
 
-            // 3. Cartoon Selection Listener (Carousel Button Listener)
+            await sendInteractiveMessage(Gifted, from, {
+                text: `🔍 *𝗖𝗞 𝗖𝗔𝗥𝗧𝗢𝗢𝗡 𝗦𝗘𝗔𝗥𝗖🇭*\n\nResults found for: *${q}*. Please select one below:`,
+                footer: safeFooter,
+                interactiveButtons: [
+                    {
+                        name: 'single_select',
+                        buttonParamsJson: JSON.stringify(searchListParams)
+                    }
+                ]
+            }, { quoted: ck });
+
+            await react("✅");
+
+            // 3. Cartoon Selection Listener (List Selection Listener)
             const cartoonSelectionListener = async (update) => {
                 try {
                     const msg = update.messages[0];
                     if (!msg || !msg.message) return;
 
                     const selectedButtonId = extractButtonId(msg.message);
-                    if (!selectedButtonId || !selectedButtonId.includes(`_${dateNow}`) || !selectedButtonId.startsWith("cartoon_dl_")) return;
+                    if (!selectedButtonId || !selectedButtonId.startsWith("cartoon_dl_")) return;
                     if (msg.key?.remoteJid !== from) return;
 
-                    const cartoonIndex = parseInt(selectedButtonId.split("_")[2]);
-                    const selectedCartoon = cartoonsSlice[cartoonIndex];
+                    const parts = selectedButtonId.split("_");
+                    const searchTimestamp = parseInt(parts[3]);
+                    const cartoonIndex = parseInt(parts[2]);
 
+                    // Fallback to current session map if timestamp matches or check active sessions
+                    const sessionData = activeCartoonSessions.get(searchTimestamp) || activeCartoonSessions.get(dateNow);
+                    if (!sessionData || !sessionData.cartoonsSlice) return;
+
+                    const selectedCartoon = sessionData.cartoonsSlice[cartoonIndex];
                     if (!selectedCartoon) return;
 
                     await react("⏳");
@@ -318,4 +302,3 @@ gmd(
         }
     }
 );
-
