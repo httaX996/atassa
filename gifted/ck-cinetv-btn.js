@@ -100,7 +100,7 @@ gmd(
                 return reply("❌ No TV Series found.");
             }
 
-            const moviesSlice = data.results.slice(0, 10);
+            const moviesSlice = data.results.slice(0, 20);
             const sessionId = Date.now().toString();
 
             tvSearchSessions.set(sessionId, {
@@ -114,52 +114,26 @@ gmd(
                 tvSearchSessions.delete(sessionId);
             }, SESSION_TIMEOUT);
 
-            const cards = await Promise.all(
-                moviesSlice.map(async (movie, index) => {
-                    const mediaContent = await generateWAMessageContent(
-                        { image: { url: movie.image || config.IMG_URL } },
-                        { upload: Gifted.waUploadToServer }
-                    );
+            // Carousel වෙනුවට single_select (List message / Button style) එක සඳහා rows සකස් කිරීම
+            const sections = [{
+                title: `🔍 Search Results for: ${q}`,
+                rows: moviesSlice.map((movie, index) => ({
+                    header: `🎬 ${movie.year || "N/A"}`,
+                    title: movie.title,
+                    description: `Click to fetch seasons`,
+                    id: `tv_seasons_${sessionId}_${index}`
+                }))
+            }];
 
-                    return {
-                        header: {
-                            title: `🎬 *${movie.title}*`,
-                            hasMediaAttachment: true,
-                            imageMessage: mediaContent.imageMessage,
-                        },
-                        body: { text: `✨ Click below to fetch seasons.` },
-                        footer: { text: `> ${botFooter}` },
-                        nativeFlowMessage: {
-                            buttons: [{
-                                name: "quick_reply",
-                                buttonParamsJson: JSON.stringify({
-                                    display_text: "📥 DOWNLOAD",
-                                    id: `tv_seasons_${sessionId}_${index}`
-                                }),
-                            }],
-                        },
-                    };
-                })
-            );
+            await sendInteractiveMessage(Gifted, from, {
+                text: `🔍 *𝗖𝗞 𝗖𝗜𝗡𝗘𝗦𝗨𝗕𝗭 𝗧𝗩 𝗦𝗘𝗔𝗥𝗖𝗛*\n\nResults found for: *${q}*\n\n🔽 *පහතින් අවශ්‍ය TV Series එක තෝරා ගන්න:*`,
+                footer: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`,
+                interactiveButtons: [{
+                    name: 'single_select',
+                    buttonParamsJson: JSON.stringify({ title: '🎬 Select TV Series', sections })
+                }]
+            }, { quoted: ck });
 
-            const carouselMessage = generateWAMessageFromContent(
-                from,
-                {
-                    viewOnceMessage: {
-                        message: {
-                            messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
-                            interactiveMessage: {
-                                body: { text: `🔍 𝗖𝗞 𝗖𝗜𝗡𝗘𝗦𝗨𝗕𝗭 𝗧𝗩 𝗦𝗘𝗔𝗥𝗖𝗛 \n\nResults for: *${q}*` },
-                                footer: { text: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*` },
-                                carouselMessage: { cards },
-                            },
-                        },
-                    },
-                },
-                { quoted: ck }
-            );
-
-            await Gifted.relayMessage(from, carouselMessage.message, { messageId: carouselMessage.key.id });
             await react("✅");
 
             // ----------------------------------------------------
@@ -344,7 +318,7 @@ gmd(
                             return Gifted.sendMessage(from, { text: "❌ First stage link generation failed." }, { quoted: ck });
                         }
 
-                        const { data: sadasData } = await axios.get(`https://apis.sadas.dev/api/v1/movie/cinesubz/dl?q=${encodeURIComponent(dlData.data.download_url)}&apiKey=ea4d57a2a2db72e0bb3ba58f56b1ff9b`);
+                        const { data: sadasData } = await axios.get(`https://apis.sadas.dev/api/v1/movie/cinesubz/dl?q=${encodeURIComponent(dlData.data.download_url)}&apiKey=e8ba4e2b4a54d477c10ec03007ea41c0`);
                         if (!sadasData.status || !sadasData.data?.links) {
                             await react("❌");
                             return Gifted.sendMessage(from, { text: "❌ Direct download link generation failed." }, { quoted: ck });
@@ -390,3 +364,4 @@ gmd(
         }
     }
 );
+
