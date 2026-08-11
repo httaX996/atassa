@@ -318,7 +318,7 @@ gmd(
                             return Gifted.sendMessage(from, { text: "❌ First stage link generation failed." }, { quoted: ck });
                         }
 
-                        const { data: sadasData } = await axios.get(`https://apis.sadas.dev/api/v1/movie/cinesubz/dl?q=${encodeURIComponent(dlData.data.download_url)}&apiKey=e8ba4e2b4a54d477c10ec03007ea41c0`);
+                        const { data: sadasData } = await axios.get(`https://apis.sadas.dev/api/v1/movie/cinesubz/dl?q=${encodeURIComponent(dlData.data.download_url)}&apiKey=aef6578e9d6927ee27b0a62e8f284e75`);
                         if (!sadasData.status || !sadasData.data?.links) {
                             await react("❌");
                             return Gifted.sendMessage(from, { text: "❌ Direct download link generation failed." }, { quoted: ck });
