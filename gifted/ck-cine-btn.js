@@ -223,7 +223,7 @@ gmd(
 
                     const initialDlUrl = dlResponse.data.data.download_url;
 
-                    const finalSadasUrl = `https://apis.sadas.dev/api/v1/movie/cinesubz/dl?q=${encodeURIComponent(initialDlUrl)}&apiKey=e8ba4e2b4a54d477c10ec03007ea41c0`;
+                    const finalSadasUrl = `https://apis.sadas.dev/api/v1/movie/cinesubz/dl?q=${encodeURIComponent(initialDlUrl)}&apiKey=aef6578e9d6927ee27b0a62e8f284e75`;
                     const sadasResponse = await axios.get(finalSadasUrl);
 
                     if (!sadasResponse.data.status || !sadasResponse.data.data?.links) {
