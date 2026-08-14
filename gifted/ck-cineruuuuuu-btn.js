@@ -113,7 +113,13 @@ gmd(
             const dateNow = Date.now();
 
             const searchUrl = `https://cineru.lk/wp-admin/admin-ajax.php?action=cineru_search&q=${encodeURIComponent(q)}&page=1&limit=100`;
-            const { data } = await axios.get(searchUrl);
+const { data } = await axios.get(searchUrl, {
+    headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://cineru.lk/'
+    }
+});
+
 
             if (!data.posts || !data.posts.length) {
                 await react("❌");
