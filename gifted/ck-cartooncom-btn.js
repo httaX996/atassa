@@ -38,16 +38,24 @@ function extractButtonId(msg) {
     return null;
 }
 
+// Fixed Thumbnail & Image converter function for WebP/JPG support
 async function createThumbnail(url) {
     try {
         if (!url) return null;
-        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        const response = await axios.get(url, { 
+            responseType: 'arraybuffer',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+            }
+        });
+        
+        // Sharp මගින් WebP හෝ ඕනෑම format එකක් JPEG thumbnail එකක් බවට convert කරයි
         return await sharp(response.data)
-            .resize(300, 300)
+            .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
             .jpeg({ quality: 80 })
             .toBuffer();
     } catch (e) {
-        console.log('Thumbnail Error:', e);
+        console.log('Thumbnail Error:', e.message);
         return null;
     }
 }
@@ -88,7 +96,7 @@ gmd(
 
             const cartoonsSlice = resultsList.slice(0, 50);
 
-            // 2. Build Interactive List Rows for Search Results (Replacing Carousel)
+            // 2. Build Interactive List Rows for Search Results
             const searchRows = cartoonsSlice.map((cartoon, index) => ({
                 header: `Result ${index + 1}`,
                 title: (cartoon.title || `Cartoon ${index + 1}`).substring(0, 24),
@@ -111,7 +119,7 @@ gmd(
             activeCartoonSessions.set(dateNow, { cartoonsSlice });
 
             await sendInteractiveMessage(Gifted, from, {
-                text: `🔍 *𝗖𝗞 𝗖𝗔𝗥𝗧𝗢𝗢𝗡 𝗦𝗘𝗔𝗥𝗖🇭*\n\nResults found for: *${q}*. Please select one below:`,
+                text: `🔍 *𝗖𝗞 𝗖𝗔𝗥𝗧𝗢𝗢𝗡 𝗦𝗘𝗔𝗥𝗖𝗛*\n\nResults found for: *${q}*. Please select one below:`,
                 footer: safeFooter,
                 interactiveButtons: [
                     {
@@ -137,7 +145,6 @@ gmd(
                     const searchTimestamp = parseInt(parts[3]);
                     const cartoonIndex = parseInt(parts[2]);
 
-                    // Fallback to current session map if timestamp matches or check active sessions
                     const sessionData = activeCartoonSessions.get(searchTimestamp) || activeCartoonSessions.get(dateNow);
                     if (!sessionData || !sessionData.cartoonsSlice) return;
 
@@ -165,11 +172,30 @@ gmd(
 
                     const imgUrl = cartoonInfo.image || selectedCartoon.image || config.IMG_URL;
 
+                    // WebP හෝ ඕනෑම image එකක් WhatsApp වලට සරලව යැවීමට buffer එකක් ලෙස convert කර යැවීම වඩාත් ආරක්ෂිතයි
                     if (imgUrl) {
-                        await Gifted.sendMessage(from, {
-                            image: { url: imgUrl },
-                            caption: caption
-                        }, { quoted: ck });
+                        try {
+                            const imgResponse = await axios.get(imgUrl, { 
+                                responseType: 'arraybuffer',
+                                headers: { 'User-Agent': 'Mozilla/5.0' }
+                            });
+                            
+                            // WebP එකක් වුණත් WhatsApp වෙත image එකක් ලෙස යැවීමට JPEG කර გაැවීම හෝ buffer එක යැවීම
+                            const processedImage = await sharp(imgResponse.data)
+                                .jpeg({ quality: 90 })
+                                .toBuffer();
+
+                            await Gifted.sendMessage(from, {
+                                image: processedImage,
+                                caption: caption
+                            }, { quoted: ck });
+                        } catch (imgErr) {
+                            console.log('Image Send Error, falling back to URL:', imgErr.message);
+                            await Gifted.sendMessage(from, {
+                                image: { url: imgUrl },
+                                caption: caption
+                            }, { quoted: ck });
+                        }
                     } else {
                         await Gifted.sendMessage(from, { text: caption }, { quoted: ck });
                     }
@@ -195,7 +221,6 @@ gmd(
                     const directLinks = dlData.direct_links;
                     const dlDateNow = Date.now();
 
-                    // Interactive List Rows for Episodes / Links
                     const linkRows = directLinks.map((linkObj, i) => ({
                         header: `Option ${i + 1}`,
                         title: (linkObj.name || `Link ${i + 1}`).substring(0, 24),
