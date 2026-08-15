@@ -191,11 +191,14 @@ gmd(
                     }, { quoted: ck });
 
                     const dlDateNow = Date.now();
-                    const qualityButtonRows = [];
+                    
+                    const subRows = [];
+                    const hcRows = [];
+                    const videoRows = [];
 
-                    // 1. Subtitle section
+                    // 1. Subtitle Section Rows
                     if (mInfo.subtitle_link) {
-                        qualityButtonRows.push({
+                        subRows.push({
                             header: `💬 SUBTITLE`,
                             title: `Download Sinhala Subtitle`,
                             description: `Get official .srt/.zip subtitle`,
@@ -203,42 +206,48 @@ gmd(
                         });
                     }
 
-                    // 2. Video Copy sections (SUBTITLE, HC VIDEO COPY, VIDEO COPY) - Including MEGA, PIXELDRAIN, GDRIVE
-                    const processHostLinks = (items, categoryName) => {
+                    // Helper to parse links and push into respective rows
+                    const parseCategoryLinks = (items, targetArray, categoryPrefix) => {
                         if (!items || !Array.isArray(items)) return;
                         items.forEach((item, catIdx) => {
                             if (!item.links) return;
                             item.links.forEach((lnk, lIdx) => {
                                 const hostUpper = lnk.host.toUpperCase();
                                 if (["PIXELDRAIN", "GDRIVE", "MEGA"].includes(hostUpper)) {
-                                    qualityButtonRows.push({
-                                        header: `📥 ${categoryName} | ${hostUpper}`,
+                                    targetArray.push({
+                                        header: `📥 ${categoryPrefix} | ${hostUpper}`,
                                         title: `${item.quality.substring(0, 40)}`,
                                         description: `Host: ${hostUpper}`,
-                                        id: `cin_link_${dlDateNow}_${catIdx}_${lIdx}_${hostUpper}`
+                                        id: `cin_link_${dlDateNow}_${catIdx}_${lIdx}_${hostUpper}_${categoryPrefix}`
                                     });
                                 }
                             });
                         });
                     };
 
-                    processHostLinks(downloads.subtitle_copy, "SUBTITLE");
-                    processHostLinks(downloads.video_copy, "VIDEO COPY");
-                    processHostLinks(downloads.hc_video_copy, "HC VIDEO");
+                    parseCategoryLinks(downloads.subtitle_copy, subRows, "SUB");
+                    parseCategoryLinks(downloads.hc_video_copy, hcRows, "HC");
+                    parseCategoryLinks(downloads.video_copy, videoRows, "VIDEO");
 
-                    if (!qualityButtonRows.length) {
+                    const sectionsList = [];
+                    if (subRows.length > 0) {
+                        sectionsList.push({ title: '⭐ SUBTITLE', rows: subRows });
+                    }
+                    if (hcRows.length > 0) {
+                        sectionsList.push({ title: '⭐ HC COPY (උපසිරැසි සහිත)', rows: hcRows });
+                    }
+                    if (videoRows.length > 0) {
+                        sectionsList.push({ title: '⭐ VIDEO COPY (උපසිරැසි රහිත)', rows: videoRows });
+                    }
+
+                    if (sectionsList.length === 0) {
                         await react("❌");
                         return reply("❌ No supported download links (Pixeldrain/GDrive/Mega) found.");
                     }
 
                     const qualityButtonParams = {
                         title: '🟢 Select Quality & Host',
-                        sections: [
-                            {
-                                title: '📥 Available Download Options',
-                                rows: qualityButtonRows
-                            }
-                        ]
+                        sections: sectionsList
                     };
 
                     activeQualitySessions.set(dlDateNow, { mInfo, downloads });
@@ -286,18 +295,19 @@ gmd(
                             document: { url: session.mInfo.subtitle_link },
                             mimetype: "application/zip",
                             fileName: `${session.mInfo.title} - Sinhala Subtitles.zip`,
-                            caption: `💬 \`Sinhala Subtitle File\`\n\n> ⚡ ᴘᴏᴡᴇʀᴇᴅ ʙʏ *CK CineMAX*`
+                            caption: `💬 \`Sinhala Subtitle File\`\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
                         }, { quoted: ck });
                         await react("✅");
                         return;
                     }
 
-                    // Media download handler
+                    // Media download handler (ID format: cin_link_{timestamp}_{catIdx}_{lIdx}_{hostType}_{categoryPrefix})
                     const parts = selectedQualityId.split("_");
                     const dlTimestamp = parseInt(parts[2]);
                     const catIdx = parseInt(parts[3]);
                     const lIdx = parseInt(parts[4]);
                     const hostType = parts[5];
+                    const categoryPrefix = parts[6];
 
                     if (!activeQualitySessions.has(dlTimestamp)) return;
                     const session = activeQualitySessions.get(dlTimestamp);
@@ -305,15 +315,14 @@ gmd(
                     let targetLinkObj = null;
                     let targetQuality = "Movie File";
 
-                    const searchCategories = [
-                        ...(session.downloads.video_copy || []),
-                        ...(session.downloads.hc_video_copy || []),
-                        ...(session.downloads.subtitle_copy || [])
-                    ];
+                    let targetSourceArray = [];
+                    if (categoryPrefix === "SUB") targetSourceArray = session.downloads.subtitle_copy || [];
+                    else if (categoryPrefix === "HC") targetSourceArray = session.downloads.hc_video_copy || [];
+                    else if (categoryPrefix === "VIDEO") targetSourceArray = session.downloads.video_copy || [];
 
-                    if (searchCategories[catIdx] && searchCategories[catIdx].links[lIdx]) {
-                        targetLinkObj = searchCategories[catIdx].links[lIdx];
-                        targetQuality = searchCategories[catIdx].quality;
+                    if (targetSourceArray[catIdx] && targetSourceArray[catIdx].links[lIdx]) {
+                        targetLinkObj = targetSourceArray[catIdx].links[lIdx];
+                        targetQuality = targetSourceArray[catIdx].quality;
                     }
 
                     if (!targetLinkObj) {
@@ -323,7 +332,7 @@ gmd(
 
                     let finalUrl = targetLinkObj.url;
 
-                    // 1. Pixeldrain Direct Link Format
+                    // Pixeldrain Direct Link Format
                     if (hostType === "PIXELDRAIN") {
                         const matchId = finalUrl.match(/\/u\/([a-zA-Z0-9_-]+)/);
                         if (matchId && matchId[1]) {
@@ -331,7 +340,7 @@ gmd(
                         }
                     }
 
-                    // 2. Mega API Integration
+                    // Mega API Integration
                     if (hostType === "MEGA") {
                         try {
                             const megaApiUrl = `https://apis.sadas.dev/api/v1/download/mega?q=${encodeURIComponent(finalUrl)}&apiKey=aef6578e9d6927ee27b0a62e8f284e75`;
@@ -352,7 +361,7 @@ gmd(
                     await react("⬆️");
                     const thumb = await createThumbnail(session.mInfo.image_url);
 
-                    // 3. Google Drive Handler
+                    // Google Drive Handler
                     if (hostType === "GDRIVE") {
                         const gdriveData = await fetchGDrive(finalUrl);
                         if (!gdriveData || !gdriveData.downloadUrl) {
@@ -365,7 +374,7 @@ gmd(
                             document: { url: gdriveData.downloadUrl },
                             fileName: `${session.mInfo.title} [${targetQuality}].mp4`,
                             mimetype: mime,
-                            caption: `🎬 \`${session.mInfo.title}\`\n🎞️ \`Quality:\` *${targetQuality}*\n\n> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+                            caption: `🎬 \`${session.mInfo.title}\`\n🎞️ \`Quality:\` *${targetQuality}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
                         };
                         if (thumb) docPayload.jpegThumbnail = thumb;
                         await Gifted.sendMessage(from, docPayload, { quoted: ck });
@@ -377,7 +386,7 @@ gmd(
                             document: { url: finalUrl },
                             fileName: fileName,
                             mimetype: "video/mp4",
-                            caption: `🎬 \`${session.mInfo.title}\`\n🎞️ \`Quality:\` *${targetQuality}*\n\n> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+                            caption: `🎬 \`${session.mInfo.title}\`\n🎞️ \`Quality:\` *${targetQuality}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
                         };
                         if (thumb) docPayload.jpegThumbnail = thumb;
                         await Gifted.sendMessage(from, docPayload, { quoted: ck });
