@@ -112,26 +112,20 @@ gmd(
             await react("🎬");
             const dateNow = Date.now();
 
-            const searchUrl = `https://cineru.lk/wp-admin/admin-ajax.php?action=cineru_search&q=${encodeURIComponent(q)}&page=1&limit=100`;
-const { data } = await axios.get(searchUrl, {
-    headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://cineru.lk/'
-    }
-});
+            const searchUrl = `https://ck-cimneru-api-20241103.vercel.app/api/search?q=${encodeURIComponent(q)}`;
+            const { data } = await axios.get(searchUrl);
 
-
-            if (!data.posts || !data.posts.length) {
+            if (!data.results || !data.results.length) {
                 await react("❌");
                 return reply("❌ No movies found on Cineru.");
             }
 
-            const moviesSlice = data.posts.slice(0, 50);
+            const moviesSlice = data.results.slice(0, 50);
 
             const buttonRows = moviesSlice.map((movie, index) => ({
                 header: `🎬 Result ${index + 1}`,
                 title: movie.title.substring(0, 50),
-                description: `Click to view options`,
+                description: `Date: ${movie.date || "N/A"}`,
                 id: `cin_dl_${index}_${dateNow}`
             }));
 
@@ -174,8 +168,7 @@ const { data } = await axios.get(searchUrl, {
 
                     await react("⏳");
 
-                    const postLink = `https://cineru.lk/?p=${selectedMovie.id}`;
-                    const infoUrl = `https://ck-cimneru-api-20241103.vercel.app/api/info?url=${encodeURIComponent(postLink)}`;
+                    const infoUrl = `https://ck-cimneru-api-20241103.vercel.app/api/info?url=${encodeURIComponent(selectedMovie.link)}`;
                     const infoResponse = await axios.get(infoUrl);
 
                     if (!infoResponse.data || infoResponse.data.status !== "success") {
@@ -193,7 +186,7 @@ const { data } = await axios.get(searchUrl, {
                     caption += `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`;
 
                     await Gifted.sendMessage(from, {
-                        image: { url: mInfo.image_url },
+                        image: { url: mInfo.image_url || selectedMovie.image_url || "https://i.ibb.co/zd34Xnr/20251021-154215.jpg" },
                         caption: caption
                     }, { quoted: ck });
 
@@ -210,7 +203,7 @@ const { data } = await axios.get(searchUrl, {
                         });
                     }
 
-                    // 2. Video Copy sections
+                    // 2. Video Copy sections (SUBTITLE, HC VIDEO COPY, VIDEO COPY) - Including MEGA, PIXELDRAIN, GDRIVE
                     const processHostLinks = (items, categoryName) => {
                         if (!items || !Array.isArray(items)) return;
                         items.forEach((item, catIdx) => {
@@ -218,14 +211,6 @@ const { data } = await axios.get(searchUrl, {
                             item.links.forEach((lnk, lIdx) => {
                                 const hostUpper = lnk.host.toUpperCase();
                                 if (["PIXELDRAIN", "GDRIVE", "MEGA"].includes(hostUpper)) {
-                                    let cleanUrl = lnk.url;
-                                    if (hostUpper === "PIXELDRAIN") {
-                                        const matchId = cleanUrl.match(/\/u\/([a-zA-Z0-9_-]+)/);
-                                        if (matchId && matchId[1]) {
-                                            cleanUrl = `https://pixeldrain.com/api/file/${matchId[1]}?download`;
-                                        }
-                                    }
-                                    
                                     qualityButtonRows.push({
                                         header: `📥 ${categoryName} | ${hostUpper}`,
                                         title: `${item.quality.substring(0, 40)}`,
@@ -283,7 +268,7 @@ const { data } = await axios.get(searchUrl, {
                     if (!msg2.message) return;
 
                     const selectedQualityId = extractButtonId(msg2.message);
-                    if (!selectedQualityId || !selectedQualityId.startsWith("cin_link_") && !selectedQualityId.startsWith("cin_sub_")) return;
+                    if (!selectedQualityId || (!selectedQualityId.startsWith("cin_link_") && !selectedQualityId.startsWith("cin_sub_"))) return;
                     if (msg2.key?.remoteJid !== from) return;
 
                     await react("⬇️");
@@ -301,7 +286,7 @@ const { data } = await axios.get(searchUrl, {
                             document: { url: session.mInfo.subtitle_link },
                             mimetype: "application/zip",
                             fileName: `${session.mInfo.title} - Sinhala Subtitles.zip`,
-                            caption: `💬 \`Sinhala Subtitle File\`\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+                            caption: `💬 \`Sinhala Subtitle File\`\n\n> ⚡ ᴘᴏᴡᴇʀᴇᴅ ʙʏ *CK CineMAX*`
                         }, { quoted: ck });
                         await react("✅");
                         return;
@@ -317,7 +302,6 @@ const { data } = await axios.get(searchUrl, {
                     if (!activeQualitySessions.has(dlTimestamp)) return;
                     const session = activeQualitySessions.get(dlTimestamp);
 
-                    // Find correct link object from categories
                     let targetLinkObj = null;
                     let targetQuality = "Movie File";
 
@@ -338,6 +322,8 @@ const { data } = await axios.get(searchUrl, {
                     }
 
                     let finalUrl = targetLinkObj.url;
+
+                    // 1. Pixeldrain Direct Link Format
                     if (hostType === "PIXELDRAIN") {
                         const matchId = finalUrl.match(/\/u\/([a-zA-Z0-9_-]+)/);
                         if (matchId && matchId[1]) {
@@ -345,9 +331,28 @@ const { data } = await axios.get(searchUrl, {
                         }
                     }
 
+                    // 2. Mega API Integration
+                    if (hostType === "MEGA") {
+                        try {
+                            const megaApiUrl = `https://apis.sadas.dev/api/v1/download/mega?q=${encodeURIComponent(finalUrl)}&apiKey=aef6578e9d6927ee27b0a62e8f284e75`;
+                            const megaRes = await axios.get(megaApiUrl);
+                            if (megaRes.data && megaRes.data.status && megaRes.data.data?.result?.download) {
+                                finalUrl = megaRes.data.data.result.download;
+                            } else {
+                                await react("❌");
+                                return reply("❌ Failed to fetch Mega direct download link.");
+                            }
+                        } catch (megaErr) {
+                            console.error("Mega API Error:", megaErr);
+                            await react("❌");
+                            return reply("❌ Error connecting to Mega API.");
+                        }
+                    }
+
                     await react("⬆️");
                     const thumb = await createThumbnail(session.mInfo.image_url);
 
+                    // 3. Google Drive Handler
                     if (hostType === "GDRIVE") {
                         const gdriveData = await fetchGDrive(finalUrl);
                         if (!gdriveData || !gdriveData.downloadUrl) {
@@ -366,7 +371,7 @@ const { data } = await axios.get(searchUrl, {
                         await Gifted.sendMessage(from, docPayload, { quoted: ck });
 
                     } else {
-                        // Pixeldrain / Direct downloads
+                        // Pixeldrain / Mega / Direct downloads
                         const fileName = `${session.mInfo.title} [${targetQuality}].mp4`;
                         const docPayload = {
                             document: { url: finalUrl },
@@ -389,17 +394,10 @@ const { data } = await axios.get(searchUrl, {
             Gifted.ev.on("messages.upsert", movieSelectionListener);
             Gifted.ev.on("messages.upsert", qualityListener);
 
-            setTimeout(() => {
-                Gifted.ev.off("messages.upsert", movieSelectionListener);
-                Gifted.ev.off("messages.upsert", qualityListener);
-                activeQualitySessions.clear();
-            }, 600000);
-
-        } catch (err) {
-            console.error(err);
-            await react("❌");
-            reply(`❌ Error: ${err.message || err}`);
-        }
+    } catch (err) {
+        console.error(err);
+        await react("❌");
+        reply(`❌ Error: ${err.message || err}`);
     }
+  }
 );
-
