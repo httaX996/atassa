@@ -127,7 +127,7 @@ gmd(
 
             // Info message
             await Gifted.sendMessage(from, {
-                text: `🎬 \`CK CineMAX DOWNLOADER\` 🎬\n\n` +
+                text: `🎬 \`CK GD DOWNLOADER\` 🎬\n\n` +
                       `📃 \`File name:\` *${gdriveData.fileName}*\n` +
                       `💈 \`File Size:\` *${gdriveData.fileSize}*\n` +
                       `🕹️ \`File type:\` *${mime}*\n\n` +
@@ -139,14 +139,14 @@ gmd(
             // Build Message Payload
             const docPayload = {
                 document: { url: gdriveData.downloadUrl },
-                fileName: `🎬 CK CineMAX 🎬 ${gdriveData.fileName}`,
+                fileName: `${gdriveData.fileName}`,
                 mimetype: mime,
-                caption: `🍿 \`${gdriveData.fileName} - සිංහල උපසිරැසි සමඟ\`\n\n> ⚡ ᴘᴏᴡᴇʀᴇᴅ ʙʏ *CK CineMAX*`
+                caption: `\`${gdriveData.fileName}\`\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
             };
 
-            if (thumb) {
-                docPayload.jpegThumbnail = thumb;
-            }
+          //  if (thumb) {
+        //        docPayload.jpegThumbnail = thumb;
+          //  }
 
             // Send file as Document
             await Gifted.sendMessage(from, docPayload, { quoted: m });
