@@ -40,7 +40,7 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
 > 🪀 *ꜰᴏʟʟᴏᴡ ᴜꜱ & ꜱᴛᴀʏ ᴛᴜɴᴇᴅ* 🪀
 > *https://whatsapp.com/channel/0029Vb8VOcx4tRruYzpW682W*
 
-> © Sinhala News 24x7 🇱🇰⚡
+> *_© Sinhala News 24x7_* 🇱🇰⚡
             `;
 
             if (news.image) {
@@ -74,7 +74,7 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
 > 🪀 *ꜰᴏʟʟᴏᴡ ᴜꜱ & ꜱᴛᴀʏ ᴛᴜɴᴇᴅ* 🪀
 > *https://whatsapp.com/channel/0029Vb8VOcx4tRruYzpW682W*
 
-> © Sinhala News 24x7 🇱🇰⚡
+> *_© Sinhala News 24x7_* 🇱🇰⚡
             `;
 
             if (news.image) {
@@ -107,7 +107,7 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
 > 🪀 *ꜰᴏʟʟᴏᴡ ᴜꜱ & ꜱᴛᴀʏ ᴛᴜɴᴇᴅ* 🪀
 > *https://whatsapp.com/channel/0029Vb8VOcx4tRruYzpW682W*
 
-> © Sinhala News 24x7 🇱🇰⚡
+> *_© Sinhala News 24x7_* 🇱🇰⚡
             `;
 
             if (news.image) {
