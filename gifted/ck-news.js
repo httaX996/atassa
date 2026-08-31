@@ -1,5 +1,5 @@
 const config = require('../config');
-const { gmd } = require('../gift'); // ගිෆ්ට් ස්ට්‍රක්චර් එක
+const { gmd } = require('../gift');
 const axios = require('axios');
 
 // අලුත් API එක
@@ -8,8 +8,8 @@ const apilink = 'https://ck-puwath-api.vercel.app/api/news';
 // ඉලක්කගත Newsletter JID එක
 const targetJid = '120363410929082905@newsletter';
 
-// මීට පෙර යවන ලද පුවත්වල URL ට්‍රැක් කර ඩබල් යැවීම වැළැක්වීමට
-let lastProcessedNewsUrl = "";
+// ඩබල් යැවීම වැළැක්වීමට අලුත්ම news_id එක ට්‍රැක් කිරීම
+let lastProcessedNewsId = "";
 
 // 1. පුවත ගෙනැවිත් යවන පොදු ෆන්ක්ෂන් එක
 const fetchAndSendNews = async (Gifted, isTest = false, replyFunc = null) => {
@@ -17,7 +17,7 @@ const fetchAndSendNews = async (Gifted, isTest = false, replyFunc = null) => {
         const response = await axios.get(apilink);
         const data = response.data;
 
-        if (!data || !data.status || !data.result) {
+        if (!data || !data.status || !data.result || !data.news_id) {
             const errMsg = "API එකෙන් නිවැරදි දත්ත ලැබී නැත!";
             if (isTest && replyFunc) return replyFunc(errMsg);
             console.error(errMsg, data);
@@ -25,9 +25,9 @@ const fetchAndSendNews = async (Gifted, isTest = false, replyFunc = null) => {
         }
 
         const news = data.result;
-        const currentNewsUrl = data.news_url;
+        const currentNewsId = data.news_id; // දැන් කෙලින්ම API එකෙන් එන ID එක පාවිච්චි කරයි[span_1](start_span)[span_1](end_span)
 
-        // Test කමාන්ඩ් එකෙන් ඇත්නම් දැන් තියෙන නිව්ස් එක යවයි
+        // Test කමාන්ඩ් එකෙන් ඇත්නම්
         if (isTest) {
             const msg = `
 \`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\`
@@ -60,15 +60,16 @@ const fetchAndSendNews = async (Gifted, isTest = false, replyFunc = null) => {
             return;
         }
 
-        // සාමාන්‍ය ඔටෝ ප්‍රොසෙස් එක සඳහා
-        if (currentNewsUrl && currentNewsUrl !== lastProcessedNewsUrl) {
-            if (lastProcessedNewsUrl === "") {
-                lastProcessedNewsUrl = currentNewsUrl;
-                console.log("📰 Auto News System Initialized. Current latest news locked:", news.title);
+        // සාමාන්‍ය ඔටෝ ප්‍රොසෙස් එක (ID එක වෙනස් වුණොත් පමණක් ක්‍රියාත්මක වේ)
+        if (currentNewsId !== lastProcessedNewsId) {
+            // බොට් මුල් වතාවට ස්ටාර්ට් වෙද්දී දැනට තියෙන නිව්ස් එක එකවර යැවීම වැළැක්වීමට ID එක ලොක් කරගනී
+            if (lastProcessedNewsId === "") {
+                lastProcessedNewsId = currentNewsId;
+                console.log("📰 Auto News System Initialized. Latest News ID Locked:", currentNewsId);
                 return;
             }
 
-            lastProcessedNewsUrl = currentNewsUrl;
+            lastProcessedNewsId = currentNewsId; // අලුත් ID එක සේව් කරගනී
 
             const msg = `
 \`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\`
@@ -81,7 +82,7 @@ const fetchAndSendNews = async (Gifted, isTest = false, replyFunc = null) => {
 🔗 \`LINK:\` *${data.news_url || 'Not Found'}*
 
 > ━━━━━━━━━━━━━━━━━━━━━
-> \`© 𝗖𝗛𝗘𝗧𝗛𝗠𝗜𝗡𝗔 𝗞𝗔𝗩𝗜ꜱ𝗛𝗔𝗡 🇱🇰⚡\`
+> \`© 𝗖𝗛𝗘𝗧𝗛𝗠𝗜𝗡𝗔 𝗞𝗔𝗩𝗜𝗦𝗛𝗔𝗡 🇱🇰⚡\`
 > *🪀 News Broadcast*
 > ━━━━━━━━━━━━━━━━━━━━━
             `;
@@ -97,7 +98,7 @@ const fetchAndSendNews = async (Gifted, isTest = false, replyFunc = null) => {
                 });
             }
 
-            console.log(`අලුත් පුවත ඔටෝ යැව්වා: ${news.title} -> ${targetJid}`);
+            console.log(`අලුත් පුවත ඔටෝ යැව්වා: ${news.title} (ID: ${currentNewsId}) -> ${targetJid}`);
         }
     } catch (e) {
         console.error('පුවත් ගැනීමේ දෝෂය:', e);
@@ -114,15 +115,11 @@ gmd(
         description: "Test auto news sending to newsletter",
     },
     async (from, Gifted, conText) => {
-        const { reply, isOwner } = conText;
+        const { reply } = conText;
 
         try {
-            // අවශ්‍ය නම් පමණක් isOwner චෙක් කරන්න (අවශ්‍ය නැත්නම් මෙම ලයින් එක ඉවත් කළ හැක)
-            // if (!isOwner) return reply("❌ Owner only command!");
-
             await reply("🔄 පුවත පරීක්ෂා කරමින් පවතී...");
             await fetchAndSendNews(Gifted, true, reply);
-
         } catch (err) {
             console.error(err);
             reply(`❌ Error: ${err.message || err}`);
@@ -131,16 +128,16 @@ gmd(
 );
 
 // 3. බොට් ස්ටාර්ට් වූ පසු පසුබිමින් ඔටෝ ක්‍රියාත්මක වන ප්‍රධාන කොටස (Background Worker)
-// මෙය බාහිරින් Gifted bot එකට connect කිරීමට module.exports ලෙස ලබා දේ
 const startAutoNewsFetcher = (Gifted) => {
-    // මුල් වතාවට ලෝඩ් වූ විට දැනට තියෙන නිව්ස් එකේ URL එක ලොක් කරගැනීම (පැරණි ඒවා ස්팸 වීම වැළැක්වීමට)
+    // බොට් ඔන් වන මොහොතේම දැනට තියෙන නිව්ස් එකේ ID එක ලබාගෙන ලොක් කර තබයි
     axios.get(apilink).then(res => {
-        if (res.data && res.data.news_url) {
-            lastProcessedNewsUrl = res.data.news_url;
+        if (res.data && res.data.news_id) {
+            lastProcessedNewsId = res.data.news_id;
+            console.log("🔒 Initial News ID Locked for Auto News:", lastProcessedNewsId);
         }
     }).catch(() => {});
 
-    // සෑම විනාඩි 5කට වරක් (තත්පර 300) ඔටෝ චෙක් කරයි
+    // සෑම විනාඩි 5කට වරක් (තත්පර 300) API එක චෙක් කරයි
     setInterval(() => {
         fetchAndSendNews(Gifted, false, null);
     }, 300 * 1000);
@@ -149,3 +146,4 @@ const startAutoNewsFetcher = (Gifted) => {
 module.exports = {
     startAutoNewsFetcher
 };
+
