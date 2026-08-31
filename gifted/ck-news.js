@@ -57,12 +57,10 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
         if (lastProcessedNewsId === "") {
             lastProcessedNewsId = currentNewsId;
             console.log(`🚀 Initial News ID Locked: ${currentNewsId}`);
-            return; // බොට් ස්ටාර්ට් වූ වහාම පරණ නිව්ස් එක ස්පෑම් වීම වැළැක්වීමට ID එක පමණක් ලොක් කර ගනී.
+            return;
         }
 
         if (currentNewsId !== lastProcessedNewsId) {
-            lastProcessedNewsId = currentNewsId;
-
             const msg = `
 📰 \`${news.title || 'Not Found'}\`
 
@@ -83,13 +81,20 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
                 } else {
                     await Gifted.sendMessage(targetJid, { text: msg });
                 }
+                
+                // මැසේජ් එක සම්පූර්ණයෙන්ම සාර්ථකව ගියාට පස්සේ පමණක් ID එක අප්ඩේට් වේ!
+                lastProcessedNewsId = currentNewsId;
                 console.log(`✨ New news detected and sent successfully! ID: ${currentNewsId} -> ${targetJid}`);
+                
             } catch (sendErr) {
                 console.error("News send error (Connection closed/Failed):", sendErr.message);
-                // කනෙක්ෂන් ප්‍රශ්නයක් නිසා පින්තූරය සමඟ යැවීම ఫේල් වුණොත් ටෙක්ස්ට් එක විතරක් යවන්න ට්‍රයි කරයි
+                // ෆේල් වුණොත් ට්‍රයි කරන්න ටෙක්ස්ට් එක විතරක් යවන්න
                 try {
                     await Gifted.sendMessage(targetJid, { text: msg });
-                } catch (e) {}
+                    lastProcessedNewsId = currentNewsId; // මෙතැනදී සාර්ථක වුණොත් පමණක් ID එක මාරු වේ
+                } catch (e) {
+                    console.log("Retry also failed, will try again in next loop.");
+                }
             }
         } else {
             console.log(`⏳ No new news. Current ID (${currentNewsId}) is same as last sent.`);
@@ -140,4 +145,3 @@ const startAutoNewsFetcher = (Gifted) => {
 module.exports = {
     startAutoNewsFetcher
 };
-
