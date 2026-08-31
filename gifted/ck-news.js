@@ -2,11 +2,16 @@ const config = require('../config');
 const { gmd } = require('../gift');
 const axios = require('axios');
 
+// API LINK
 const apilink = 'https://ck-puwath-api.vercel.app/api/news';
+
+// ඉලක්කගත Newsletter JID එක
 const targetJid = '120363410929082905@newsletter';
 
+// මීට පෙර යවන ලද හෝ ලොක් කළ news_id එක ගබඩා කරගැනීමට
 let lastProcessedNewsId = "";
 
+// පුවත API එකෙන් ගෙනැවිත් යවන ප්‍රධාන කාර්යය (Core Function)
 const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) => {
     try {
         const response = await axios.get(apilink);
@@ -22,7 +27,7 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
         const news = data.result;
         const currentNewsId = data.news_id;
 
-        // Test Mode (.testnews දැමූ විට)
+        // 1. .testnews කමාන්ඩ් එකෙන් ඇත්නම්
         if (isTest) {
             const msg = `
 \`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\`
@@ -55,42 +60,9 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
             return;
         }
 
-        // Auto Loop Process (বොට් ඔන් වූ වහාම හෝ විනාඩියෙන් විනාඩියට)
+        // 2. ඔටෝ ලූප් ප්‍රොසෙස් එක (බොට් ස්ටාර්ට් වූ පසු හෝ විනාඩියෙන් විනාඩියට ක්‍රියාත්මක වේ)
+        // බොට් ස්ටාර්ට් වූ පළමු වතාවට lastProcessedNewsId එක හිස්ව පවතින බැවින්, එම මොහොතේ API එකේ ඇති නිව්ස් එක යවා ID එක සේව් කරගනී.
         if (lastProcessedNewsId === "") {
-            lastProcessedNewsId = currentNewsId;
-
-            const msg = `
-\`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\`
-*📰 \`${news.title || 'Not Found'}\` 📰*
-\`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\`
-
-✍🏻 ${news.description || 'Not Found'}
-
-📆 \`DATE:\` *${news.date || 'Not Found'}* | \`TIME:\` *${news.time || 'Not Found'}*
-🔗 \`LINK:\` *${data.news_url || 'Not Found'}*
-
-> ━━━━━━━━━━━━━━━━━━━━━
-> \`© 𝗖𝗛Ե𝗛𝗠𝗜𝗡𝗔 𝗞𝗔𝗩𝗜𝗦𝗛𝗔𝗡 🇱🇰⚡\`
-> *🪀 News Broadcast*
-> ━━━━━━━━━━━━━━━━━━━━━
-            `;
-
-            if (news.image) {
-                await Gifted.sendMessage(targetJid, { 
-                    image: { url: news.image }, 
-                    caption: msg 
-                });
-            } else {
-                await Gifted.sendMessage(targetJid, { 
-                    text: msg 
-                });
-            }
-
-            console.log(`🚀 Bot Restarted / Started: Initial news sent & ID saved: ${currentNewsId} -> ${targetJid}`);
-            return;
-        }
-
-        if (currentNewsId !== lastProcessedNewsId) {
             lastProcessedNewsId = currentNewsId;
 
             const msg = `
@@ -120,7 +92,44 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
                 });
             }
 
+            console.log(`🚀 Bot Connected/Restarted: Initial news sent & ID saved: ${currentNewsId} -> ${targetJid}`);
+            return;
+        }
+
+        // අලුත් news_id එකක් දැයි පරීක්ෂා කිරීම (කලින් යවපු එකම නම් යවන්නේ නැත)
+        if (currentNewsId !== lastProcessedNewsId) {
+            lastProcessedNewsId = currentNewsId; // අලුත් ID එක save කරගනී
+
+            const msg = `
+\`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\`
+*📰 \`${news.title || 'Not Found'}\` 📰*
+\`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\`
+
+✍🏻 ${news.description || 'Not Found'}
+
+📆 \`DATE:\` *${news.date || 'Not Found'}* | \`TIME:\` *${news.time || 'Not Found'}*
+🔗 \`LINK:\` *${data.news_url || 'Not Found'}*
+
+> ━━━━━━━━━━━━━━━━━━━━━
+> \`© 𝗖𝗛𝗘𝗧𝗛𝗠𝗜𝗡𝗔 𝗞𝗔𝗩𝗜𝗦𝗛𝗔𝗡 🇱🇰⚡\`
+> *🪀 News Broadcast*
+> ━━━━━━━━━━━━━━━━━━━━━
+            `;
+
+            if (news.image) {
+                await Gifted.sendMessage(targetJid, { 
+                    image: { url: news.image }, 
+                    caption: msg 
+                });
+            } else {
+                await Gifted.sendMessage(targetJid, { 
+                    text: msg 
+                });
+            }
+
             console.log(`✨ New news detected and sent! ID: ${currentNewsId} -> ${targetJid}`);
+        } else {
+            console.log(`⏳ No new news. Current ID (${currentNewsId}) is same as last sent.`);
         }
 
     } catch (e) {
@@ -129,7 +138,7 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
     }
 };
 
-// Test Command එක
+// .testnews කමාන්ඩ් එක (কোඩ් එක වැඩද බලාගන්න)
 gmd(
     {
         pattern: "testnews",
@@ -139,6 +148,7 @@ gmd(
     },
     async (from, Gifted, conText) => {
         const { reply } = conText;
+
         try {
             await reply("🔄 පුවත පරීක්ෂා කරමින් පවතී...");
             await checkAndSendLatestNews(Gifted, true, reply);
@@ -149,20 +159,19 @@ gmd(
     }
 );
 
-// බොට් ස්ටාර්ට් වූ වහාම ලූප් එක ක්‍රියාත්මක කරන ප්‍රධාන ෆන්ක්ෂන් එක
+// බොට් ඔන් වූ සැණින් ක්‍රියාත්මක වන පසුබිම් ලූප් සිස්ටම් එක (Background Worker)
 const startAutoNewsFetcher = (Gifted) => {
     console.log("🔄 Auto News Background Loop Started...");
-    
-    // බොට් ඔන් වූ වහාම පළමු වතාවට රන් වීම
+
+    // 1. බොට් ස්ටාර්ට් වූ වහාම පළමු වතාවට රන් කර Current News එක යැවීම සහ ID එක සේව් කිරීම
     checkAndSendLatestNews(Gifted, false, null);
 
-    // විනාඩියෙන් විනාඩියට ලූප් වීම
+    // 2. හරියටම සෑම විනාඩියකට වරක් (මිලිතත්පර 60,000) API එකට රික්වෙස්ට් යවා ලූප් එක පවත්වා ගැනීම
     setInterval(() => {
         checkAndSendLatestNews(Gifted, false, null);
     }, 60 * 1000);
 };
 
-// මෙන්න මේක අනිවාර්යයෙන්ම අවශ්‍යයි (Export කිරීම)
 module.exports = {
     startAutoNewsFetcher
 };
