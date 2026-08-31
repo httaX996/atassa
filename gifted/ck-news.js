@@ -2,17 +2,17 @@ const config = require('../config');
 const { gmd } = require('../gift');
 const axios = require('axios');
 
-// අලුත් API එක
+// API LINK
 const apilink = 'https://ck-puwath-api.vercel.app/api/news';
 
 // ඉලක්කගත Newsletter JID එක
 const targetJid = '120363410929082905@newsletter';
 
-// ඩබල් යැවීම වැළැක්වීමට අලුත්ම news_id එක ට්‍රැක් කිරීම
+// මීට පෙර යවන ලද හෝ ලොක් කළ news_id එක ගබඩා කරගැනීමට
 let lastProcessedNewsId = "";
 
-// 1. පුවත ගෙනැවිත් යවන පොදු ෆන්ක්ෂන් එක
-const fetchAndSendNews = async (Gifted, isTest = false, replyFunc = null) => {
+// පුවත API එකෙන් ගෙනැවිත් යවන ප්‍රධාන කාර්යය (Core Function)
+const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) => {
     try {
         const response = await axios.get(apilink);
         const data = response.data;
@@ -25,9 +25,9 @@ const fetchAndSendNews = async (Gifted, isTest = false, replyFunc = null) => {
         }
 
         const news = data.result;
-        const currentNewsId = data.news_id; // දැන් කෙලින්ම API එකෙන් එන ID එක පාවිච්චි කරයි[span_1](start_span)[span_1](end_span)
+        const currentNewsId = data.news_id;
 
-        // Test කමාන්ඩ් එකෙන් ඇත්නම්
+        // 1. .testnews කමාන්ඩ් එකෙන් ඇත්නම්
         if (isTest) {
             const msg = `
 \`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\`
@@ -60,16 +60,10 @@ const fetchAndSendNews = async (Gifted, isTest = false, replyFunc = null) => {
             return;
         }
 
-        // සාමාන්‍ය ඔටෝ ප්‍රොසෙස් එක (ID එක වෙනස් වුණොත් පමණක් ක්‍රියාත්මක වේ)
-        if (currentNewsId !== lastProcessedNewsId) {
-            // බොට් මුල් වතාවට ස්ටාර්ට් වෙද්දී දැනට තියෙන නිව්ස් එක එකවර යැවීම වැළැක්වීමට ID එක ලොක් කරගනී
-            if (lastProcessedNewsId === "") {
-                lastProcessedNewsId = currentNewsId;
-                console.log("📰 Auto News System Initialized. Latest News ID Locked:", currentNewsId);
-                return;
-            }
-
-            lastProcessedNewsId = currentNewsId; // අලුත් ID එක සේව් කරගනී
+        // 2. ඔටෝ ලූප් ප්‍රොසෙස් එක (බොට් ස්ටාර්ට් වූ පසු හෝ විනාඩියෙන් විනාඩියට ක්‍රියාත්මක වේ)
+        // බොට් ස්ටාර්ට් වූ පළමු වතාවට lastProcessedNewsId එක හිස්ව පවතින බැවින්, එම මොහොතේ API එකේ ඇති නිව්ස් එක යවා ID එක සේව් කරගනී.
+        if (lastProcessedNewsId === "") {
+            lastProcessedNewsId = currentNewsId;
 
             const msg = `
 \`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\`
@@ -98,15 +92,54 @@ const fetchAndSendNews = async (Gifted, isTest = false, replyFunc = null) => {
                 });
             }
 
-            console.log(`අලුත් පුවත ඔටෝ යැව්වා: ${news.title} (ID: ${currentNewsId}) -> ${targetJid}`);
+            console.log(`🚀 Bot Started: Initial news sent & ID saved: ${currentNewsId} -> ${targetJid}`);
+            return;
         }
+
+        // අලුත් news_id එකක් දැයි පරීක්ෂා කිරීම (කලින් යවපු එකම නම් යවන්නේ නැත)
+        if (currentNewsId !== lastProcessedNewsId) {
+            lastProcessedNewsId = currentNewsId; // අලුත් ID එක save කරගනී
+
+            const msg = `
+\`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\`
+*📰 \`${news.title || 'Not Found'}\` 📰*
+\`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\`
+
+✍🏻 ${news.description || 'Not Found'}
+
+📆 \`DATE:\` *${news.date || 'Not Found'}* | \`TIME:\` *${news.time || 'Not Found'}*
+🔗 \`LINK:\` *${data.news_url || 'Not Found'}*
+
+> ━━━━━━━━━━━━━━━━━━━━━
+> \`© 𝗖𝗛𝗘𝗧𝗛𝗠𝗜𝗡𝗔 𝗞𝗔𝗩𝗜𝗦𝗛𝗔𝗡 🇱🇰⚡\`
+> *🪀 News Broadcast*
+> ━━━━━━━━━━━━━━━━━━━━━
+            `;
+
+            if (news.image) {
+                await Gifted.sendMessage(targetJid, { 
+                    image: { url: news.image }, 
+                    caption: msg 
+                });
+            } else {
+                await Gifted.sendMessage(targetJid, { 
+                    text: msg 
+                });
+            }
+
+            console.log(`✨ New news detected and sent! ID: ${currentNewsId} -> ${targetJid}`);
+        } else {
+            // වෙනස් වී නැත නම් කිසිවක් නොකරයි (Loop එක දිගටම ක්‍රියාත්මක වේ)
+            console.log(`⏳ No new news. Current ID (${currentNewsId}) is same as last sent.`);
+        }
+
     } catch (e) {
         console.error('පුවත් ගැනීමේ දෝෂය:', e);
         if (isTest && replyFunc) replyFunc(`❌ දෝෂයක් ඇතිවිය: ${e.message}`);
     }
 };
 
-// 2. `.testnews` සඳහා gmd කමාන්ඩ් එක
+// .testnews කමාන්ඩ් එක (কোඩ් එක වැඩද බලාගන්න)
 gmd(
     {
         pattern: "testnews",
@@ -119,7 +152,7 @@ gmd(
 
         try {
             await reply("🔄 පුවත පරීක්ෂා කරමින් පවතී...");
-            await fetchAndSendNews(Gifted, true, reply);
+            await checkAndSendLatestNews(Gifted, true, reply);
         } catch (err) {
             console.error(err);
             reply(`❌ Error: ${err.message || err}`);
@@ -127,23 +160,19 @@ gmd(
     }
 );
 
-// 3. බොට් ස්ටාර්ට් වූ පසු පසුබිමින් ඔටෝ ක්‍රියාත්මක වන ප්‍රධාන කොටස (Background Worker)
+// බොට් ඔන් වූ සැණින් ක්‍රියාත්මක වන පසුබිම් ලූප් සිස්ටම් එක (Background Worker)
 const startAutoNewsFetcher = (Gifted) => {
-    // බොට් ඔන් වන මොහොතේම දැනට තියෙන නිව්ස් එකේ ID එක ලබාගෙන ලොක් කර තබයි
-    axios.get(apilink).then(res => {
-        if (res.data && res.data.news_id) {
-            lastProcessedNewsId = res.data.news_id;
-            console.log("🔒 Initial News ID Locked for Auto News:", lastProcessedNewsId);
-        }
-    }).catch(() => {});
+    console.log("🔄 Auto News Background Loop Started...");
 
-    // සෑම විනාඩි 5කට වරක් (තත්පර 300) API එක චෙක් කරයි
+    // 1. බොට් ස්ටාර්ට් වූ වහාම පළමු වතාවට රන් කර Current News එක යැවීම සහ ID එක සේව් කිරීම
+    checkAndSendLatestNews(Gifted, false, null);
+
+    // 2. හරියටම සෑම විනාඩියකට වරක් (මිලිතත්පර 60,000) API එකට රික්වෙස්ට් යවා ලූප් එක පවත්වා ගැනීම
     setInterval(() => {
-        fetchAndSendNews(Gifted, false, null);
-    }, 300 * 1000);
+        checkAndSendLatestNews(Gifted, false, null);
+    }, 60 * 1000);
 };
 
 module.exports = {
     startAutoNewsFetcher
 };
-
