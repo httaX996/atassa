@@ -30,19 +30,17 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
         // 1. .testnews කමාන්ඩ් එකෙන් ඇත්නම්
         if (isTest) {
             const msg = `
-\`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\`
-*📰 \`${news.title || 'Not Found'}\` 📰* (TEST MODE)
-\`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\`
+📰 \`${news.title || 'Not Found'}\`
 
 ✍🏻 ${news.description || 'Not Found'}
 
-📆 \`DATE:\` *${news.date || 'Not Found'}* | \`TIME:\` *${news.time || 'Not Found'}*
-🔗 \`LINK:\` *${data.news_url || 'Not Found'}*
+📆\`DATE:\` *${news.date || 'Not Found'}* | ⏰\`TIME:\` *${news.time || 'Not Found'}*
+🔗\`LINK:\` *${data.news_url || 'Not Found'}*
 
-> ━━━━━━━━━━━━━━━━━━━━━
-> \`© 𝗖𝗛𝗘𝗧𝗛𝗠𝗜𝗡𝗔 𝗞𝗔𝗩𝗜𝗦𝗛𝗔𝗡 🇱🇰⚡\`
-> *🪀 News Broadcast*
-> ━━━━━━━━━━━━━━━━━━━━━
+> 🪀 *ꜰᴏʟʟᴏᴡ ᴜꜱ & ꜱᴛᴀʏ ᴛᴜɴᴇᴅ* 🪀
+> *https://whatsapp.com/channel/0029Vb8VOcx4tRruYzpW682W*
+
+> © Sinhala News 24x7 🇱🇰⚡
             `;
 
             if (news.image) {
@@ -66,19 +64,17 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
             lastProcessedNewsId = currentNewsId;
 
             const msg = `
-\`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\`
-*📰 \`${news.title || 'Not Found'}\` 📰*
-\`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\`
+📰 \`${news.title || 'Not Found'}\`
 
 ✍🏻 ${news.description || 'Not Found'}
 
-📆 \`DATE:\` *${news.date || 'Not Found'}* | \`TIME:\` *${news.time || 'Not Found'}*
-🔗 \`LINK:\` *${data.news_url || 'Not Found'}*
+📆\`DATE:\` *${news.date || 'Not Found'}* | ⏰\`TIME:\` *${news.time || 'Not Found'}*
+🔗\`LINK:\` *${data.news_url || 'Not Found'}*
 
-> ━━━━━━━━━━━━━━━━━━━━━
-> \`© 𝗖𝗛𝗘𝗧𝗛𝗠𝗜𝗡𝗔 𝗞𝗔𝗩𝗜𝗦𝗛𝗔𝗡 🇱🇰⚡\`
-> *🪀 News Broadcast*
-> ━━━━━━━━━━━━━━━━━━━━━
+> 🪀 *ꜰᴏʟʟᴏᴡ ᴜꜱ & ꜱᴛᴀʏ ᴛᴜɴᴇᴅ* 🪀
+> *https://whatsapp.com/channel/0029Vb8VOcx4tRruYzpW682W*
+
+> © Sinhala News 24x7 🇱🇰⚡
             `;
 
             if (news.image) {
@@ -101,19 +97,17 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
             lastProcessedNewsId = currentNewsId; // අලුත් ID එක save කරගනී
 
             const msg = `
-\`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\`
-*📰 \`${news.title || 'Not Found'}\` 📰*
-\`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\`
+📰 \`${news.title || 'Not Found'}\`
 
 ✍🏻 ${news.description || 'Not Found'}
 
-📆 \`DATE:\` *${news.date || 'Not Found'}* | \`TIME:\` *${news.time || 'Not Found'}*
-🔗 \`LINK:\` *${data.news_url || 'Not Found'}*
+📆\`DATE:\` *${news.date || 'Not Found'}* | ⏰\`TIME:\` *${news.time || 'Not Found'}*
+🔗\`LINK:\` *${data.news_url || 'Not Found'}*
 
-> ━━━━━━━━━━━━━━━━━━━━━
-> \`© 𝗖𝗛𝗘𝗧𝗛𝗠𝗜𝗡𝗔 𝗞𝗔𝗩𝗜𝗦𝗛𝗔𝗡 🇱🇰⚡\`
-> *🪀 News Broadcast*
-> ━━━━━━━━━━━━━━━━━━━━━
+> 🪀 *ꜰᴏʟʟᴏᴡ ᴜꜱ & ꜱᴛᴀʏ ᴛᴜɴᴇᴅ* 🪀
+> *https://whatsapp.com/channel/0029Vb8VOcx4tRruYzpW682W*
+
+> © Sinhala News 24x7 🇱🇰⚡
             `;
 
             if (news.image) {
