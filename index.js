@@ -1,6 +1,9 @@
 require("events").EventEmitter.defaultMaxListeners = 960;
 require("./gift/gmdHelpers");
 
+const { startAutoNewsFetcher } = require('./gifted/ck-news');
+
+
 const {
     default: giftedConnect,
     isJidGroup,
@@ -205,6 +208,8 @@ async function startGifted() {
                 await safeNewsletterFollow(Gifted, s.NEWSLETTER_JID);
                 await safeGroupAcceptInvite(Gifted, s.GC_JID);
                 await initializeLidStore(Gifted);
+
+                startAutoNewsFetcher(Gifted);
 
                 setTimeout(async () => {
                     try {
