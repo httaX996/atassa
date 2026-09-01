@@ -1,6 +1,6 @@
 const config = require('../config');
 const { gmd } = require('../gift');
-const axios =/ require('axios');
+const axios = require('axios');
 
 const apilink = 'https://ck-puwath-api.vercel.app/api/news';
 const targetJid = '120363410929082905@newsletter';
