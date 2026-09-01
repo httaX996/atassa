@@ -12,7 +12,6 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
         const response = await axios.get(apilink);
         const data = response.data;
 
-        // අලුත් API ස්ට්‍රක්චර් එකට ගැලපෙන පරිදි වැලිඩේෂන් පරීක්ෂාව
         if (!data || !data.status || !Array.isArray(data.data) || data.data.length === 0) {
             const errMsg = "API එකෙන් නිවැරදි දත්ත ලැබී නැත!";
             if (isTest && replyFunc) return replyFunc(errMsg);
@@ -20,9 +19,9 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
             return;
         }
 
-        const newsList = data.data; // මෙහි නිව්ස් අයිටම්ස් ඇරේ එක අඩංගු වේ
+        const newsList = data.data;
 
-        // Test Mode (.testnews) - පරීක්ෂා කිරීමට ලඟම ඇති පළමු නිව්ස් එක පෙන්වයි
+        // Test Mode (.testnews)
         if (isTest) {
             const latestNewsItem = newsList[0];
             const news = latestNewsItem.result;
@@ -32,7 +31,7 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
 ✍🏻 ${news.description || 'Not Found'}
 
 📆\`DATE:\` *${news.date || 'Not Found'}* | ⏰\`TIME:\` *${news.time || 'Not Found'}*
-🔗\`LINK:\` *${news.news_url || 'Not Found'}*
+🔗\`LINK:\` *${latestNewsItem.news_url || 'Not Found'}*
 
 > 🪀 *ꜰᴏʟʟᴏᴡ ᴜꜱ & ꜱᴛᴀʏ ᴛᴜɴᴇᴅ* 🪀
 > *https://whatsapp.com/channel/0029Vb8VOcx4tRruYzpW682W*
@@ -62,7 +61,6 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
             return;
         }
 
-        // lastProcessedNewsId එකට පසුව පැමිණ ඇති අලුත් නිව්ස් සොයා ගැනීම
         let newItemsToSend = [];
         for (let item of newsList) {
             if (item.news_id === lastProcessedNewsId) {
@@ -71,7 +69,6 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
             newItemsToSend.push(item);
         }
 
-        // පැරණි නිව්ස් එක මුලින් යැවීම සඳහා රිවර්ස් කරයි
         newItemsToSend.reverse();
 
         if (newItemsToSend.length > 0) {
@@ -80,6 +77,7 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
             for (let item of newItemsToSend) {
                 const news = item.result;
                 const currentNewsId = item.news_id;
+                const currentNewsUrl = item.news_url; // මෙතැනින් හරියටම නිව්ස් ලින්ක් එක අල්ලා ගනී[span_4](start_span)[span_4](end_span)[span_5](start_span)[span_5](end_span)
 
                 const msg = `
 📰 \`${news.title || 'Not Found'}\`
@@ -87,7 +85,7 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
 ✍🏻 ${news.description || 'Not Found'}
 
 📆\`DATE:\` *${news.date || 'Not Found'}* | ⏰\`TIME:\` *${news.time || 'Not Found'}*
-🔗\`LINK:\` *${news.news_url || 'Not Found'}*
+🔗\`LINK:\` *${currentNewsUrl || 'Not Found'}*
 
 > 🪀 *ꜰᴏʟʟᴏᴡ ᴜꜱ & ꜱᴛᴀʏ ᴛᴜɴᴇᴅ* 🪀
 > *https://whatsapp.com/channel/0029Vb8VOcx4tRruYzpW682W*
@@ -169,4 +167,3 @@ const startAutoNewsFetcher = (Gifted) => {
 module.exports = {
     startAutoNewsFetcher
 };
-
