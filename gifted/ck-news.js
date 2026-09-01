@@ -32,7 +32,7 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
 ✍🏻 ${news.description || 'Not Found'}
 
 📆\`DATE:\` *${news.date || 'Not Found'}* | ⏰\`TIME:\` *${news.time || 'Not Found'}*
-🔗\`LINK:\` *${item.news_url || 'Not Found'}*
+🔗\`LINK:\` *${news.news_url || 'Not Found'}*
 
 > 🪀 *ꜰᴏʟʟᴏᴡ ᴜꜱ & ꜱᴛᴀʏ ᴛᴜɴᴇᴅ* 🪀
 > *https://whatsapp.com/channel/0029Vb8VOcx4tRruYzpW682W*
@@ -87,7 +87,7 @@ const checkAndSendLatestNews = async (Gifted, isTest = false, replyFunc = null) 
 ✍🏻 ${news.description || 'Not Found'}
 
 📆\`DATE:\` *${news.date || 'Not Found'}* | ⏰\`TIME:\` *${news.time || 'Not Found'}*
-🔗\`LINK:\` *${item.news_url || 'Not Found'}*
+🔗\`LINK:\` *${news.news_url || 'Not Found'}*
 
 > 🪀 *ꜰᴏʟʟᴏᴡ ᴜꜱ & ꜱᴛᴀʏ ᴛᴜɴᴇᴅ* 🪀
 > *https://whatsapp.com/channel/0029Vb8VOcx4tRruYzpW682W*
