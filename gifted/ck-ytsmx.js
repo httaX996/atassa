@@ -13,7 +13,7 @@ const ck = {
     },
     message: {
         contactMessage: {
-            displayName: "〴ᴄʜᴇᴛʜᴍɪɴᴀ ×͜×",
+            displayName: "〴ᴄʜᴇᴛʜᴍɪɴᱟ ×͜×",
             vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:Meta\nORG:META AI;\nTEL;type=CELL;type=VOICE;waid=13135550002:+13135550002\nEND:VCARD`
         }
     }
@@ -141,7 +141,7 @@ gmd(
                     caption += `🎭 \`GENRE:\` *${movie.genre || "N/A"}*\n`;
                     caption += `⭐ \`IMDB:\` *${movie.imdb || "N/A"}*\n`;
                     caption += `📝 \`PLOT:\` _${movie.plot?.slice(0, 180)}..._\n\n`;
-                    caption += `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`;
+                    caption += `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᱟ ᴋᴀᴠɪꜱʜᴀɴ*`;
 
                     await Gifted.sendMessage(from, {
                         image: { url: movie.image },
@@ -189,7 +189,7 @@ gmd(
                 }
             };
 
-            // 4. Quality & Magnet Download Listener
+            // 4. Quality & Magnet Download Listener (Fixed with timeout & wait message)
             const qualityListener = async (update2) => {
                 try {
                     const msg2 = update2.messages[0];
@@ -208,11 +208,19 @@ gmd(
                     const qIndex = parseInt(parts[3]);
                     const finalQuality = session.downloads[qIndex];
 
-                    await react("⬇️");
+                    await react("⏳");
+                    await reply("⏳ *Generating direct link... This may take a few seconds, please wait!*");
 
-                    // Magnet Convert API
+                    // Magnet Convert API (Timeout වැඩි කර ඇත - තත්පර 120 / 120000ms)
                     const magnetApiUrl = `https://ck-pahe-inc-api-123xyz.vercel.app/api/magnet?url=${encodeURIComponent(finalQuality.url)}`;
-                    const magnetResponse = await axios.get(magnetApiUrl);
+                    
+                    let magnetResponse;
+                    try {
+                        magnetResponse = await axios.get(magnetApiUrl, { timeout: 120000 });
+                    } catch (apiErr) {
+                        await react("❌");
+                        return reply("❌ The server took too long to generate the link or encountered an error. Please try again later.", msg2);
+                    }
 
                     if (!magnetResponse.data.success || !magnetResponse.data.download_url) {
                         await react("❌");
@@ -225,7 +233,7 @@ gmd(
                     const thumb = await createThumbnail(session.movie.image);
 
                     // File caption with quality & type
-                    const fileCaption = `🎬 \`${session.movie.title}\`\n\n🎞️ \`Quality:\` *${finalQuality.quality} - ${finalQuality.type}*\n💾 \`Size:\` *${finalQuality.size}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`;
+                    const fileCaption = `🎬 \`${session.movie.title}\`\n\n🎞️ \`Quality:\` *${finalQuality.quality} - ${finalQuality.type}*\n💾 \`Size:\` *${finalQuality.size}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᱟ ᴋᴀᴠɪꜱʜᴀɴ*`;
 
                     await Gifted.sendMessage(from, {
                         document: { url: directLink },
