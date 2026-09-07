@@ -156,28 +156,59 @@ gmd(
 
                     const dlDateNow = Date.now();
 
-                    // 3. Quality Interactive List එක සකස් කිරීම
-                    const qualityButtonRows = (movie.downloads || []).map((dl, i) => ({
-                        header: `🏷️ ${dl.host || 'Server'}`,
-                        title: `📥 ${dl.quality}`,
-                        description: `📦 Size: ${dl.size}`,
-                        id: `ssm_link_${movieIndex}_${i}_${dlDateNow}`
-                    }));
+                    // Downloads Grouping / Categorize කිරීම (Host එක අනුව)
+                    const downloadsList = movie.downloads || [];
+                    const groupedDownloads = {};
+
+                    downloadsList.forEach((dl) => {
+                        // Telegram Links ඉවත් කිරීම
+                        if (dl.url && (dl.url.includes("t.me") || dl.url.includes("telegram"))) return;
+
+                        const hostName = (dl.host || 'SERVER').toUpperCase();
+                        if (!groupedDownloads[hostName]) {
+                            groupedDownloads[hostName] = [];
+                        }
+                        groupedDownloads[hostName].push(dl);
+                    });
+
+                    // Interactive List එකට අදාළ Sections සෑදීම
+                    const sections = [];
+                    // Flat Array එකක් ලෙස පසුබිමේ තබා ගැනීම (Index මගින් හඳුනා ගැනීමට)
+                    const flatDownloads = [];
+
+                    Object.keys(groupedDownloads).forEach((host) => {
+                        const rows = groupedDownloads[host].map((dl) => {
+                            const globalIndex = flatDownloads.length;
+                            flatDownloads.push(dl);
+
+                            return {
+                                header: `⚡ ${host}`,
+                                title: `📥 ${dl.quality}`,
+                                description: `📦 Size: ${dl.size}`,
+                                id: `ssm_link_${movieIndex}_${globalIndex}_${dlDateNow}`
+                            };
+                        });
+
+                        sections.push({
+                            title: `📁 ${host} DOWNLOADS`,
+                            rows: rows
+                        });
+                    });
+
+                    if (sections.length === 0) {
+                        await react("❌");
+                        return reply("❌ No valid download links available.", msg);
+                    }
 
                     const qualityButtonParams = {
-                        title: '🟢 Select Video Quality',
-                        sections: [
-                            {
-                                title: '📥 Available Download Links',
-                                rows: qualityButtonRows
-                            }
-                        ]
+                        title: '🟢 Select Download Server & Quality',
+                        sections: sections
                     };
 
-                    activeQualitySessions.set(dlDateNow, { movie, downloads: movie.downloads });
+                    activeQualitySessions.set(dlDateNow, { movie, downloads: flatDownloads });
 
                     await sendInteractiveMessage(Gifted, from, {
-                        text: '🔽 *Please select your preferred download options below:*',
+                        text: '🔽 *Please select your preferred Server and Quality below:*',
                         footer: botFooter,
                         interactiveButtons: [
                             {
@@ -216,7 +247,7 @@ gmd(
 
                     await react("⬇️");
 
-                    // 3. Direct Download Link API
+                    // DL API call
                     const dlUrl = `https://ck-sinhalasub-api-1a2b3c4d5e.vercel.app/api/dl?url=${encodeURIComponent(finalQuality.url)}`;
                     const dlResponse = await axios.get(dlUrl);
 
@@ -225,8 +256,22 @@ gmd(
                         return reply("❌ Direct download link could not be fetched.", msg2);
                     }
 
-                    const directDownloadUrl = dlResponse.data.result.url;
+                    let directDownloadUrl = dlResponse.data.result.url;
                     const fileName = dlResponse.data.result.name || session.movie.title;
+
+                    // Telegram Check (ආරක්ෂිත පියවරක් ලෙස)
+                    if (directDownloadUrl.includes("t.me") || directDownloadUrl.includes("telegram")) {
+                        await react("❌");
+                        return reply("❌ Telegram links are not supported.", msg2);
+                    }
+
+                    // Pixeldrain URL එක Direct API Download Link එකක් බවට මාරු කිරීම
+                    if (directDownloadUrl.includes("pixeldrain.com/u/")) {
+                        const fileId = directDownloadUrl.split("/u/")[1]?.split("?")[0]?.trim();
+                        if (fileId) {
+                            directDownloadUrl = `https://pixeldrain.com/api/file/${fileId}?download`;
+                        }
+                    }
 
                     await react("⬆️");
                     const thumb = await createThumbnail(session.movie.image);
@@ -236,7 +281,7 @@ gmd(
                         mimetype: "video/mp4",
                         fileName: `${fileName}.mp4`,
                         jpegThumbnail: thumb,
-                        caption: `🎬 \`${fileName}\`\n\n🎞️ \`Quality:\` *${finalQuality.quality}*\n📦 \`Size:\` *${finalQuality.size}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜ繆ᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+                        caption: `🎬 \`${fileName}\`\n\n🎞️ \`Quality:\` *${finalQuality.quality}*\n📦 \`Size:\` *${finalQuality.size}*\n🖥️ \`Server:\` *${finalQuality.host || 'N/A'}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
                     }, { quoted: ck });
 
                     await react("✅");
@@ -263,4 +308,3 @@ gmd(
         }
     }
 );
-
