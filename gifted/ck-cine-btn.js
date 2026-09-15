@@ -84,7 +84,7 @@ gmd(
             }));
 
             const buttonParams = {
-                title: '📂 𝖲𝖤𝖫𝖤𝖢𝖳 𝖠 𝖬𝖮𝖵𝖨𝖤',
+                title: '📂 SELECT A MOVIE',
                 sections: [
                     {
                         title: '🌟 𝖢𝗂𝗇𝖾Subz 𝖲𝖾𝖺𝗋𝖼𝗁 𝖱𝖾𝗌𝗎𝗅𝗍𝗌',
@@ -94,7 +94,7 @@ gmd(
             };
 
             await sendInteractiveMessage(Gifted, from, {
-                text: `✨ *ᴄʜᴇᴛʜᴍɪɴᴀ • ᴄɪɴᴇꜱᴜʙᴢ ʜᴜʙ* ✨\n\n🎯 *Search Query:* \`${q}\`\n📂 *Total Found:* \`${moviesSlice.length} Movies\`\n\n> ⚡ *Please select your desired movie from the menu below:*`,
+                text: `✨ 𝗖𝗜𝗡𝗘𝗦𝗨𝗕𝗭 𝗠𝗢𝗩𝗜𝗘\n\n🎯 *Search Query:* \`${q}\`\n📂 *Total Found:* \`${moviesSlice.length} Movies\`\n\n> ⚡ *Please select your desired movie from the menu below:*`,
                 footer: botFooter,
                 interactiveButtons: [
                     {
@@ -138,7 +138,7 @@ gmd(
                     caption += `⭐ \`IMDB:\` *${movie.imdb || "N/A"}* / 10\n`;
                     caption += `⏳ \`TIME:\` *${movie.time || "N/A"}*\n`;
                     caption += `🌍 \`COUNTRY:\` *${movie.country || "N/A"}*\n`;
-                    caption += `🎭 \`CAST:\` ${movie.cast?.slice(1, 5).map(c => `✨ *${c}*`).join(', ') || "N/A"}\n\n`;
+                    caption += `🎭 \`CAST:\` ${movie.cast?.slice(1, 5).map(c => `, *${c}*`).join(', ') || "N/A"}\n\n`;
                     caption += `📝 \`STORY:\` _${movie.description?.slice(0, 160)}..._\n\n`;
                     caption += `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`;
 
@@ -151,16 +151,16 @@ gmd(
 
                     const qualityButtonRows = movie.downloads.map((dl, i) => ({
                         header: `📥 Quality: ${dl.quality}`,
-                        title: `🚀 Download [${dl.quality}]`,
+                        title: `🚀 [${dl.quality}]`,
                         description: `💾 File Size: ${dl.size || "Unknown"}`,
                         id: `cine_link_${movieIndex}_${i}_${dlDateNow}`
                     }));
 
                     const qualityButtonParams = {
-                        title: '🎯 𝖲𝖤𝖫𝖤𝖢𝖳 𝖵𝖨𝖣𝖤𝖮 𝖰𝖴𝖠𝖫𝖨𝖳𝖸',
+                        title: '🎯 SELECT QUALITY',
                         sections: [
                             {
-                                title: '⚡ 𝖠𝗏𝖺𝗂𝗅𝖺𝖻𝗅𝖾 𝖣𝗈𝗐𝗇𝗅𝗈𝖺𝖽 𝖱𝑒ѕᴏʟᴜᴛɪᴏɴѕ',
+                                title: '⚡ ᴀᴠᴀɪʟᴀʙʟᴇ ʀᴇꜱᴏʟᴜᴛɪᴏɴꜱ',
                                 rows: qualityButtonRows
                             }
                         ]
@@ -169,7 +169,7 @@ gmd(
                     activeQualitySessions.set(dlDateNow, { movie, downloads: movie.downloads });
 
                     await sendInteractiveMessage(Gifted, from, {
-                        text: `🍿 *ᴄʜᴇᴛʜᴍɪɴᴀ • ᴍᴏᴠɪᴇ ᴅᴏᴡɴʟᴏᴀᴅ ʜᴜʙ*\n\n🎯 *Selected:* \`${movie.title}\`\n\n> ✨ *Please tap below to select your preferred video resolution & size:*`,
+                        text: `✨ *Please select quality*`,
                         footer: botFooter,
                         interactiveButtons: [
                             {
