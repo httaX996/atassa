@@ -124,7 +124,7 @@ gmd(
             }];
 
             await sendInteractiveMessage(Gifted, from, {
-                text: `🔍 *ᴄᴋ ᴄɪɴᴇꜱᴜʙᴢ ᴛᴠ ꜱᴇᴀʀᴄʜ ʜᴜʙ*\n\n✨ Results found for: *${q}*\n\n🔽 *පහත ලැයිස්තුවෙන් ඔබට අවශ්‍ය TV Series එක තෝරා ගන්න:*`,
+                text: `🔍 𝗖𝗜𝗡𝗘𝗦𝗨𝗕𝗭 𝗧𝗩 𝗦𝗘𝗥𝗜𝗘𝗦\n\n✨ Results found for: *${q}*\n\n🔽 *පහත ලැයිස්තුවෙන් ඔබට අවශ්‍ය TV Series එක තෝරා ගන්න:*`,
                 footer: `👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`,
                 interactiveButtons: [{
                     name: 'single_select',
