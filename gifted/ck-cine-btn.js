@@ -42,7 +42,7 @@ async function createThumbnail(url) {
             .jpeg({ quality: 80 })
             .toBuffer();
     } catch (e) {
-        console.log('Thumbnail Error:', e);
+        console.log('🖼️ Thumbnail Generation Error:', e);
         return null;
     }
 }
@@ -52,7 +52,7 @@ gmd(
         pattern: "cineck",
         category: "movie",
         aliases: ["cinesubz", "cine"],
-        description: "Search movies from CineSubz with Buttons",
+        description: "Search movies from CineSubz with Premium Buttons",
     },
     async (from, Gifted, conText) => {
         const { q, reply, react, botFooter } = conText;
@@ -60,43 +60,41 @@ gmd(
         try {
             if (!q) {
                 await react("❌");
-                return reply("🎬 Please provide a movie name.\n\nExample:\n.cineck deadpool");
+                return reply("⚠️ *Please provide a movie name to search!*\n\n💡 *Example:* `👑 .cineck deadpool`");
             }
 
             await react("🎬");
 
             const dateNow = Date.now();
-            // 1. අලුත් Search API එක
             const searchUrl = `https://chethmina-kavishan-cinesubz-api-v1.vercel.app/api/search?q=${encodeURIComponent(q)}`;
             const { data } = await axios.get(searchUrl);
 
             if (!data.success || !data.results || !data.results.length) {
                 await react("❌");
-                return reply("❌ No movies found.");
+                return reply("❌ *Oops! No movies found matching your query.* 🔍");
             }
 
             const moviesSlice = data.results.slice(0, 50);
             
-            // Carousel වෙනුවට Interactive List එකක් සකස් කිරීම
             const buttonRows = moviesSlice.map((movie, index) => ({
-                header: `🎬 Result ${index + 1}`,
-                title: movie.title.substring(0, 50), // Title එක දිග වැඩි වුණොත් කපා හැරීමට
-                description: `Click to view options`,
+                header: `🎬 Result #${index + 1}`,
+                title: `🎥 ${movie.title.substring(0, 45)}`,
+                description: `✨ Tap here to view full details & downloads`,
                 id: `cine_dl_${index}_${dateNow}`
             }));
 
             const buttonParams = {
-                title: '🔍 Select a Movie',
+                title: '📂 𝖲𝖤𝖫𝖤𝖢𝖳 𝖠 𝖬𝖮𝖵𝖨𝖤',
                 sections: [
                     {
-                        title: '🎬 Available Movies',
+                        title: '🌟 𝖢𝗂𝗇𝖾Subz 𝖲𝖾𝖺𝗋𝖼𝗁 𝖱𝖾𝗌𝗎𝗅𝗍𝗌',
                         rows: buttonRows
                     }
                 ]
             };
 
             await sendInteractiveMessage(Gifted, from, {
-                text: `🔍 *𝗖𝗞 𝗖𝗜𝗡𝗘𝗦𝗨𝗕𝗭 𝗦𝗘𝗔𝗥𝗖𝗛* \n\nResults for: *${q}*`,
+                text: `✨ *ᴄʜᴇᴛʜᴍɪɴᴀ • ᴄɪɴᴇꜱᴜʙᴢ ʜᴜʙ* ✨\n\n🎯 *Search Query:* \`${q}\`\n📂 *Total Found:* \`${moviesSlice.length} Movies\`\n\n> ⚡ *Please select your desired movie from the menu below:*`,
                 footer: botFooter,
                 interactiveButtons: [
                     {
@@ -108,10 +106,9 @@ gmd(
 
             await react("✅");
 
-            // Global/Session tracking Maps
             const activeQualitySessions = new Map();
 
-            // 2. DOWNLOAD බටන් ලිස්නර් එක
+            // 1. Movie Selection Listener
             const movieSelectionListener = async (update) => {
                 try {
                     const msg = update.messages[0];
@@ -126,24 +123,23 @@ gmd(
 
                     await react("⏳");
 
-                    // අලුත් Movie Info API එක
                     const infoUrl = `https://chethmina-kavishan-cinesubz-api-v1.vercel.app/api/minfo?url=${encodeURIComponent(selectedMovie.link)}`;
                     const infoResponse = await axios.get(infoUrl);
 
                     if (!infoResponse.data.success) {
                         await react("❌");
-                        return reply("❌ Failed to fetch movie details.", msg);
+                        return reply("❌ *Failed to fetch cinematic details for this movie.* ⚠️", msg);
                     }
 
                     const movie = infoResponse.data.data;
 
-                    let caption = `🎬 \`${movie.title}\`\n\n`;
+                    let caption = `🌟 \`${movie.title}\`\n\n`;
                     caption += `📅 \`YEAR:\` *${movie.year || "N/A"}*\n`;
-                    caption += `⭐ \`IMDB:\` *${movie.imdb || "N/A"}*\n`;
+                    caption += `⭐ \`IMDB:\` *${movie.imdb || "N/A"}* / 10\n`;
                     caption += `⏳ \`TIME:\` *${movie.time || "N/A"}*\n`;
                     caption += `🌍 \`COUNTRY:\` *${movie.country || "N/A"}*\n`;
-                    caption += `🎭 \`CAST:\` ${movie.cast?.slice(1, 5).map(c => `*• ${c}*`).join('\n') || "N/A"}\n\n`;
-                    caption += `📝 \`DESC:\` _${movie.description?.slice(0, 150)}..._\n\n`;
+                    caption += `🎭 \`CAST:\` ${movie.cast?.slice(1, 5).map(c => `✨ *${c}*`).join(', ') || "N/A"}\n\n`;
+                    caption += `📝 \`STORY:\` _${movie.description?.slice(0, 160)}..._\n\n`;
                     caption += `> 👨🏻‍💻 ᴍᴀᴅᴇ ʙʏ *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`;
 
                     await Gifted.sendMessage(from, {
@@ -153,19 +149,18 @@ gmd(
 
                     const dlDateNow = Date.now();
 
-                    // 3. Quality Interactive List එක සකස් කිරීම
                     const qualityButtonRows = movie.downloads.map((dl, i) => ({
-                        header: `${dl.quality}`,
-                        title: `Download ${dl.quality}`,
-                        description: `Size: ${dl.size}`,
+                        header: `📥 Quality: ${dl.quality}`,
+                        title: `🚀 Download [${dl.quality}]`,
+                        description: `💾 File Size: ${dl.size || "Unknown"}`,
                         id: `cine_link_${movieIndex}_${i}_${dlDateNow}`
                     }));
 
                     const qualityButtonParams = {
-                        title: '🟢 Select Video Quality',
+                        title: '🎯 𝖲𝖤𝖫𝖤𝖢𝖳 𝖵𝖨𝖣𝖤𝖮 𝖰𝖴𝖠𝖫𝖨𝖳𝖸',
                         sections: [
                             {
-                                title: '📥 Available Download Links',
+                                title: '⚡ 𝖠𝗏𝖺𝗂𝗅𝖺𝖻𝗅𝖾 𝖣𝗈𝗐𝗇𝗅𝗈𝖺𝖽 𝖱𝑒ѕᴏʟᴜᴛɪᴏɴѕ',
                                 rows: qualityButtonRows
                             }
                         ]
@@ -174,7 +169,7 @@ gmd(
                     activeQualitySessions.set(dlDateNow, { movie, downloads: movie.downloads });
 
                     await sendInteractiveMessage(Gifted, from, {
-                        text: '🔽 *Please select your preferred movie quality below:*',
+                        text: `🍿 *ᴄʜᴇᴛʜᴍɪɴᴀ • ᴍᴏᴠɪᴇ ᴅᴏᴡɴʟᴏᴀᴅ ʜᴜʙ*\n\n🎯 *Selected:* \`${movie.title}\`\n\n> ✨ *Please tap below to select your preferred video resolution & size:*`,
                         footer: botFooter,
                         interactiveButtons: [
                             {
@@ -192,7 +187,7 @@ gmd(
                 }
             };
 
-            // 4. Quality බටන් එක ක්ලික් කළ පසු ඩොකියුමන්ට් එකක් ලෙස යැවීමේ ලිස්නර් එක
+            // 2. Quality Selection & Direct DL Listener (Using only provided API)
             const qualityListener = async (update2) => {
                 try {
                     const msg2 = update2.messages[0];
@@ -213,31 +208,16 @@ gmd(
 
                     await react("⬇️");
 
+                    // Using the single requested API endpoint
                     const dlUrl = `https://chethmina-kavishan-cinesubz-api-v1.vercel.app/api/dl?url=${encodeURIComponent(finalQuality.download_link)}`;
                     const dlResponse = await axios.get(dlUrl);
 
-                    if (!dlResponse.data.success || !dlResponse.data.data?.download_url) {
+                    if (!dlResponse.data.status || !dlResponse.data.direct_link) {
                         await react("❌");
-                        return reply("❌ First stage download link not found.", msg2);
+                        return reply("❌ *Failed to extract direct download link from API response.* ⚠️", msg2);
                     }
 
-                    const initialDlUrl = dlResponse.data.data.download_url;
-
-                    const finalSadasUrl = `https://apis.sadas.dev/api/v1/movie/cinesubz/dl?q=${encodeURIComponent(initialDlUrl)}&apiKey=aef6578e9d6927ee27b0a62e8f284e75`;
-                    const sadasResponse = await axios.get(finalSadasUrl);
-
-                    if (!sadasResponse.data.status || !sadasResponse.data.data?.links) {
-                        await react("❌");
-                        return reply("❌ Direct download link could not be generated.", msg2);
-                    }
-
-                    const links = sadasResponse.data.data.links || [];
-                    const directLink = links.find(link => !link.includes("t.me") && !link.includes("telegram"));
-
-                    if (!directLink) {
-                        await react("❌");
-                        return reply("❌ Direct download link not found (Filtered Telegram out).", msg2);
-                    }
+                    const directLink = dlResponse.data.direct_link;
 
                     await react("⬆️");
                     const thumb = await createThumbnail(session.movie.poster);
@@ -245,9 +225,9 @@ gmd(
                     await Gifted.sendMessage(from, {
                         document: { url: directLink },
                         mimetype: "video/mp4",
-                        fileName: `${sadasResponse.data.data.title || session.movie.title}.mp4`,
+                        fileName: `${dlResponse.data.title || session.movie.title} [${dlResponse.data.quality || finalQuality.quality}].mp4`,
                         jpegThumbnail: thumb,
-                        caption: `🎬 \`${session.movie.title}\`\n\n🎞️ \`Quality:\` *${finalQuality.quality}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
+                        caption: `🎬 \`${session.movie.title}\`\n\n🎞️ \`Resolution:\` *${dlResponse.data.quality || finalQuality.quality}*\n\n> 👨🏻‍💻 *ᴄʜᴇᴛʜᴍɪɴᴀ ᴋᴀᴠɪꜱʜᴀɴ*`
                     }, { quoted: ck });
 
                     await react("✅");
@@ -270,8 +250,7 @@ gmd(
         } catch (err) {
             console.error(err);
             await react("❌");
-            reply(`❌ Error: ${err.message || err}`);
+            reply(`❌ *System Error:* \`${err.message || err}\``);
         }
     }
 );
-
